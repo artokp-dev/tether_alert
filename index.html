@@ -5,29 +5,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>김치 프리미엄</title>
 <style>
-  html,body{margin:0;height:100%;background:#0a0a0f;color:#fff;
+  html,body{margin:0;min-height:100%;background:#0a0a0f;color:#fff;
     font-family:-apple-system,'Malgun Gothic',sans-serif;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px 0;box-sizing:border-box;}
   .label{font-size:15px;color:#888;letter-spacing:3px;}
-  .kimp{font-size:26vw;font-weight:800;line-height:1;transition:opacity .3s;}
-  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;}
-  .kimp.stale{opacity:.5;}
-  .sub{font-size:15px;color:#888;text-align:center;line-height:1.8;padding:0 12px;}
-  .sub b{color:#fff;}
+  .row{display:flex;width:100%;max-width:520px;}
+  .ex{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;}
+  .ex + .ex{border-left:1px solid #1e1e2e;}
+  .exname{font-size:14px;color:#aaa;letter-spacing:2px;font-weight:700;}
+  .kimp{font-size:clamp(30px,13vw,74px);font-weight:800;line-height:1;transition:opacity .3s;}
+  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;} .kimp.stale{opacity:.45;}
+  .price{font-size:13px;color:#777;}
+  .sub{font-size:13px;color:#666;text-align:center;line-height:1.7;padding:0 12px;}
+  .sub b{color:#aaa;}
   .t{font-size:12px;color:#444;min-height:16px;}
 </style>
 </head>
 <body>
   <div class="label">김치 프리미엄</div>
-  <div class="kimp" id="kimp">…</div>
+  <div class="row">
+    <div class="ex">
+      <div class="exname">업비트</div>
+      <div class="kimp" id="upKimp">…</div>
+      <div class="price" id="upPrice"></div>
+    </div>
+    <div class="ex">
+      <div class="exname">빗썸</div>
+      <div class="kimp" id="biKimp">…</div>
+      <div class="price" id="biPrice"></div>
+    </div>
+  </div>
   <div class="sub" id="sub">불러오는 중…</div>
   <div class="t" id="t"></div>
 
 <script>
-// 마지막으로 성공한 값을 계속 기억 → 한 소스가 잠깐 실패해도 화면이 안 사라짐
-let lastUsdt = null, lastRate = null, lastSrc = '';
+// 각 소스의 마지막 성공값 기억 → 순간 실패해도 화면 유지 (조회 실패 안 뜸)
+let lastUp = null, lastBi = null, lastRate = null, lastSrc = '';
 
-// 짧은 타임아웃 fetch (한 소스가 멈춰도 오래 안 기다림)
 function fetchJson(url, ms){
   const c = new AbortController();
   const t = setTimeout(()=>c.abort(), ms || 4000);
@@ -36,44 +50,53 @@ function fetchJson(url, ms){
     .finally(()=>clearTimeout(t));
 }
 
-async function getUsdt(){
+async function getUpbit(){
   const u = await fetchJson('https://api.upbit.com/v1/ticker?markets=KRW-USDT');
   return u[0].trade_price;
 }
-
+async function getBithumb(){
+  const b = await fetchJson('https://api.bithumb.com/public/ticker/USDT_KRW');
+  return parseFloat(b.data.closing_price);
+}
 async function getRate(){
-  // 1순위: 두나무 기준환율 (국내 김프 표준)
   try{
     const fx = await fetchJson('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD');
     if(fx[0] && fx[0].basePrice) return {rate: fx[0].basePrice, src:'두나무'};
   }catch(e){}
-  // 백업: 무료 환율 API
   const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
   return {rate: fx.rates.KRW, src:'환율API'};
 }
 
-async function load(){
-  // 두 소스를 독립적으로 시도 → 성공한 것만 갱신, 실패한 건 이전 값 유지
-  let freshUsdt = false, freshRate = false;
-  const jobs = [
-    getUsdt().then(v=>{ lastUsdt = v; freshUsdt = true; }).catch(()=>{}),
-    getRate().then(o=>{ lastRate = o.rate; lastSrc = o.src; freshRate = true; }).catch(()=>{}),
-  ];
-  await Promise.all(jobs);
+function paint(elId, priceId, price, rate, fresh){
+  const el = document.getElementById(elId);
+  if(price === null || rate === null){ return; }
+  const k = (price/rate - 1) * 100;
+  el.textContent = (k>=0?'+':'') + k.toFixed(2) + '%';
+  el.className = 'kimp ' + (k>=0?'pos':'neg') + (fresh ? '' : ' stale');
+  document.getElementById(priceId).textContent = '테더 ' + price.toLocaleString() + '원';
+}
 
-  if(lastUsdt === null || lastRate === null){
+async function load(){
+  let fUp=false, fBi=false, fRate=false;
+  await Promise.all([
+    getUpbit().then(v=>{lastUp=v; fUp=true;}).catch(()=>{}),
+    getBithumb().then(v=>{lastBi=v; fBi=true;}).catch(()=>{}),
+    getRate().then(o=>{lastRate=o.rate; lastSrc=o.src; fRate=true;}).catch(()=>{}),
+  ]);
+
+  if(lastRate === null || (lastUp === null && lastBi === null)){
     document.getElementById('sub').textContent = '연결 재시도 중…';
-    return; // 아직 한 번도 못 받음
+    return;
   }
 
-  const kimp = (lastUsdt/lastRate - 1) * 100;
-  const el = document.getElementById('kimp');
-  el.textContent = (kimp>=0?'+':'') + kimp.toFixed(2) + '%';
-  el.className = 'kimp ' + (kimp>=0?'pos':'neg') + ((freshUsdt && freshRate) ? '' : ' stale');
+  paint('upKimp','upPrice', lastUp, lastRate, fUp && fRate);
+  paint('biKimp','biPrice', lastBi, lastRate, fBi && fRate);
+
   document.getElementById('sub').innerHTML =
-    `테더 <b>${lastUsdt.toLocaleString()}원</b> · 환율 <b>${Number(lastRate).toLocaleString()}원</b> <small>(${lastSrc})</small>`;
+    `실제 환율 <b>${Number(lastRate).toLocaleString()}원</b> (${lastSrc})`;
+  const allFresh = fUp && fBi && fRate;
   document.getElementById('t').textContent =
-    new Date().toLocaleTimeString('ko-KR') + ' 기준' + ((freshUsdt && freshRate) ? '' : ' · 일부 갱신 지연');
+    new Date().toLocaleTimeString('ko-KR') + ' 기준' + (allFresh ? '' : ' · 일부 갱신 지연');
 }
 
 load();
