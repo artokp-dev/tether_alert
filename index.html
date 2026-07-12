@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>김치 프리미엄</title>
+<style>
+  html,body{margin:0;height:100%;background:#0a0a0f;color:#fff;
+    font-family:-apple-system,'Malgun Gothic',sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+  .label{font-size:15px;color:#888;letter-spacing:3px;}
+  .kimp{font-size:26vw;font-weight:800;line-height:1;}
+  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;}
+  .sub{font-size:15px;color:#888;text-align:center;line-height:1.8;padding:0 12px;}
+  .sub b{color:#fff;}
+  .t{font-size:12px;color:#444;}
+</style>
+</head>
+<body>
+  <div class="label">김치 프리미엄</div>
+  <div class="kimp" id="kimp">…</div>
+  <div class="sub" id="sub">불러오는 중…</div>
+  <div class="t" id="t"></div>
+
+<script>
+async function getRate(){
+  // 1순위: 두나무 기준환율 (국내 김프 표준)
+  try{
+    const fx = await fetch('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD').then(r=>r.json());
+    const rate = fx[0].basePrice;
+    if(rate) return {rate, src:'두나무'};
+  }catch(e){}
+  // 백업: 무료 환율 API
+  const fx = await fetch('https://open.er-api.com/v6/latest/USD').then(r=>r.json());
+  return {rate: fx.rates.KRW, src:'환율API'};
+}
+
+async function load(){
+  try{
+    const u = await fetch('https://api.upbit.com/v1/ticker?markets=KRW-USDT').then(r=>r.json());
+    const usdt = u[0].trade_price;          // 업비트 테더 가격(원)
+    const {rate, src} = await getRate();     // 실제 원-달러 환율
+    const kimp = (usdt/rate - 1) * 100;      // 김치 프리미엄 %
+
+    const el = document.getElementById('kimp');
+    el.textContent = (kimp>=0?'+':'') + kimp.toFixed(2) + '%';
+    el.className = 'kimp ' + (kimp>=0?'pos':'neg');
+    document.getElementById('sub').innerHTML =
+      `테더 <b>${usdt.toLocaleString()}원</b> · 환율 <b>${Number(rate).toLocaleString()}원</b> <small>(${src})</small>`;
+    document.getElementById('t').textContent = new Date().toLocaleTimeString('ko-KR') + ' 기준 · 5초마다 갱신';
+  }catch(e){
+    document.getElementById('sub').textContent = '조회 실패: ' + e.message;
+  }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
