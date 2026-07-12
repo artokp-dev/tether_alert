@@ -16,7 +16,7 @@
 <style>
   html,body{margin:0;min-height:100%;background:#0a0a0f;color:#fff;
     font-family:-apple-system,'Malgun Gothic',sans-serif;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px 0;box-sizing:border-box;}
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px 0;box-sizing:border-box;}
   .label{font-size:15px;color:#888;letter-spacing:3px;}
   .row{display:flex;width:100%;max-width:520px;}
   .ex{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;}
@@ -25,12 +25,32 @@
   .kimp{font-size:clamp(30px,13vw,74px);font-weight:800;line-height:1;transition:opacity .3s;}
   .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;} .kimp.stale{opacity:.45;}
   .price{font-size:13px;color:#777;}
+  .card{width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;}
+  .spread{display:flex;justify-content:space-between;align-items:center;
+    background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:14px 16px;}
+  .spread .lbl{font-size:13px;color:#888;}
+  .spread .v{font-weight:800;font-size:22px;font-family:'Menlo',monospace;color:#e8e8f5;}
+  .spread.hot{border-color:#ff4d5e;background:rgba(255,77,94,.08);}
+  .spread.hot .v{color:#ff4d5e;}
+  .ctrl{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}
+  .ctrl label{font-size:13px;color:#888;}
+  .ctrl input{width:52px;background:#12121a;border:1px solid #1e1e2e;color:#fff;
+    border-radius:8px;padding:8px;font-size:15px;text-align:center;}
+  #alarmBtn{background:#00ff88;color:#0a0a0f;border:none;border-radius:10px;
+    padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;}
+  #alarmBtn.on{background:rgba(0,255,136,.12);color:#00ff88;border:1px solid #00ff88;}
   .sub{font-size:13px;color:#666;text-align:center;line-height:1.7;padding:0 12px;}
   .sub b{color:#aaa;}
   .t{font-size:12px;color:#444;min-height:16px;}
+  .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;
+    text-align:center;padding:18px 12px;font-weight:800;font-size:16px;
+    transform:translateY(-110%);transition:transform .3s;z-index:99;
+    padding-top:calc(18px + env(safe-area-inset-top));}
+  .flash.show{transform:translateY(0);}
 </style>
 </head>
 <body>
+  <div class="flash" id="flash"></div>
   <div class="label">김치 프리미엄</div>
   <div class="row">
     <div class="ex">
@@ -44,12 +64,77 @@
       <div class="price" id="biPrice"></div>
     </div>
   </div>
+
+  <div class="card">
+    <div class="spread" id="spreadBox">
+      <span class="lbl">업비트·빗썸 테더 차이</span>
+      <span class="v" id="spreadVal">—</span>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <label>알림 기준 <input id="thr" type="number" value="3" min="0.5" step="0.5" inputmode="decimal"></label>
+    <span style="font-size:13px;color:#888">원 이상</span>
+    <button id="alarmBtn">🔔 소리 알림 켜기</button>
+  </div>
+
   <div class="sub" id="sub">불러오는 중…</div>
   <div class="t" id="t"></div>
 
 <script>
 // 각 소스의 마지막 성공값 기억 → 순간 실패해도 화면 유지 (조회 실패 안 뜸)
 let lastUp = null, lastBi = null, lastRate = null, lastSrc = '';
+// 알림 상태
+let alarmOn = false, audioCtx = null, lastAlert = 0;
+
+const thrEl = document.getElementById('thr');
+thrEl.value = localStorage.getItem('kimp_thr') || '3';
+thrEl.onchange = () => localStorage.setItem('kimp_thr', thrEl.value);
+
+// 소리 알림은 사용자가 버튼을 눌러야 켜짐(브라우저 자동재생 정책)
+document.getElementById('alarmBtn').onclick = function(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    beep(); // 테스트 삐 소리
+  }catch(e){}
+  if('Notification' in window && Notification.permission !== 'granted'){
+    try{ Notification.requestPermission(); }catch(e){}
+  }
+  alarmOn = true;
+  this.textContent = '🔔 알림 켜짐 ✅';
+  this.classList.add('on');
+};
+
+function beep(){
+  if(!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.type = 'sine'; o.frequency.value = 880;
+  const now = audioCtx.currentTime;
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.4, now + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+  o.start(now); o.stop(now + 0.17);
+}
+
+function fireAlert(sp){
+  const dir = lastUp > lastBi ? '업비트 > 빗썸' : '빗썸 > 업비트';
+  beep(); setTimeout(beep, 220); setTimeout(beep, 440);   // 삐-삐-삐
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  const f = document.getElementById('flash');
+  f.textContent = `🚨 테더 차이 ${sp.toFixed(1)}원 (${dir})`;
+  f.classList.add('show');
+  setTimeout(()=>f.classList.remove('show'), 4000);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{
+      new Notification('🚨 USDT 차익 ' + sp.toFixed(1) + '원', {
+        body: `업비트 ${lastUp.toLocaleString()}원 · 빗썸 ${lastBi.toLocaleString()}원 (${dir})`,
+        icon: 'icon-192.png'
+      });
+    }catch(e){}
+  }
+}
 
 function fetchJson(url, ms){
   const c = new AbortController();
@@ -100,6 +185,18 @@ async function load(){
 
   paint('upKimp','upPrice', lastUp, lastRate, fUp && fRate);
   paint('biKimp','biPrice', lastBi, lastRate, fBi && fRate);
+
+  // 업비트·빗썸 테더 가격 차이 + 알림
+  if(lastUp !== null && lastBi !== null){
+    const sp = Math.abs(lastUp - lastBi);
+    const thr = parseFloat(thrEl.value) || 3;
+    document.getElementById('spreadVal').textContent = sp.toFixed(1) + '원';
+    document.getElementById('spreadBox').className = 'spread' + (sp >= thr ? ' hot' : '');
+    if(alarmOn && sp >= thr && Date.now() - lastAlert > 60000){
+      lastAlert = Date.now();
+      fireAlert(sp);
+    }
+  }
 
   document.getElementById('sub').innerHTML =
     `실제 환율 <b>${Number(lastRate).toLocaleString()}원</b> (${lastSrc})`;
