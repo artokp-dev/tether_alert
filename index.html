@@ -83,7 +83,7 @@
 
 <script>
 // 각 소스의 마지막 성공값 기억 → 순간 실패해도 화면 유지 (조회 실패 안 뜸)
-let lastUp = null, lastBi = null, lastRate = null, lastSrc = '';
+let lastUp = null, lastBi = null, lastRate = null, lastSrc = '', lastUpdated = '';
 // 알림 상태
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
@@ -153,12 +153,20 @@ async function getBithumb(){
   return parseFloat(b.data.closing_price);
 }
 async function getRate(){
+  // 1순위: 두나무 기준환율 (국내 김프 표준, 몇 분마다 갱신)
   try{
     const fx = await fetchJson('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD');
-    if(fx[0] && fx[0].basePrice) return {rate: fx[0].basePrice, src:'두나무'};
+    const f0 = fx && fx[0];
+    if(f0 && f0.basePrice){
+      let up = '';
+      if(f0.timestamp) up = new Date(f0.timestamp).toLocaleTimeString('ko-KR');
+      else if(f0.date && f0.time) up = String(f0.time).slice(0,5);
+      return {rate: f0.basePrice, src:'두나무', updated: up};
+    }
   }catch(e){}
+  // 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
   const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
-  return {rate: fx.rates.KRW, src:'환율API'};
+  return {rate: fx.rates.KRW, src:'백업·하루1회', updated: ''};
 }
 
 function paint(elId, priceId, price, rate, fresh){
@@ -175,7 +183,7 @@ async function load(){
   await Promise.all([
     getUpbit().then(v=>{lastUp=v; fUp=true;}).catch(()=>{}),
     getBithumb().then(v=>{lastBi=v; fBi=true;}).catch(()=>{}),
-    getRate().then(o=>{lastRate=o.rate; lastSrc=o.src; fRate=true;}).catch(()=>{}),
+    getRate().then(o=>{lastRate=o.rate; lastSrc=o.src; lastUpdated=o.updated; fRate=true;}).catch(()=>{}),
   ]);
 
   if(lastRate === null || (lastUp === null && lastBi === null)){
@@ -199,7 +207,8 @@ async function load(){
   }
 
   document.getElementById('sub').innerHTML =
-    `실제 환율 <b>${Number(lastRate).toLocaleString()}원</b> (${lastSrc})`;
+    `실제 환율 <b>${Number(lastRate).toLocaleString()}원</b> ` +
+    `(${lastSrc}${lastUpdated ? ' · ' + lastUpdated + ' 갱신' : ''})`;
   const allFresh = fUp && fBi && fRate;
   document.getElementById('t').textContent =
     new Date().toLocaleTimeString('ko-KR') + ' 기준' + (allFresh ? '' : ' · 일부 갱신 지연');
