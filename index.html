@@ -152,19 +152,27 @@ async function getBithumb(){
   const b = await fetchJson('https://api.bithumb.com/public/ticker/USDT_KRW');
   return parseFloat(b.data.closing_price);
 }
+function parseDunamu(fx){
+  const f0 = fx && fx[0];
+  if(f0 && f0.basePrice){
+    let up = '';
+    if(f0.timestamp) up = new Date(f0.timestamp).toLocaleTimeString('ko-KR');
+    else if(f0.date && f0.time) up = String(f0.time).slice(0,5);
+    return {rate: f0.basePrice, src:'두나무', updated: up};
+  }
+  return null;
+}
+
 async function getRate(){
-  // 1순위: 두나무 기준환율 (국내 김프 표준, 몇 분마다 갱신)
+  const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
+  // 1) 두나무 직접 호출 (몇 분마다 갱신되는 실제 기준환율)
+  try{ const r = parseDunamu(await fetchJson(DUNAMU)); if(r) return r; }catch(e){}
+  // 2) 두나무를 CORS 우회 통로로 호출 (아이폰 등에서 직접 호출이 막힐 때)
   try{
-    const fx = await fetchJson('https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD');
-    const f0 = fx && fx[0];
-    if(f0 && f0.basePrice){
-      let up = '';
-      if(f0.timestamp) up = new Date(f0.timestamp).toLocaleTimeString('ko-KR');
-      else if(f0.date && f0.time) up = String(f0.time).slice(0,5);
-      return {rate: f0.basePrice, src:'두나무', updated: up};
-    }
+    const r = parseDunamu(await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(DUNAMU), 7000));
+    if(r) return r;
   }catch(e){}
-  // 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
+  // 3) 최후의 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
   const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
   return {rate: fx.rates.KRW, src:'백업·하루1회', updated: ''};
 }
