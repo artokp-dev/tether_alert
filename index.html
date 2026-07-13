@@ -173,9 +173,18 @@ function parseDunamu(fx){
 
 async function getRate(){
   const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
-  // 두나무 기준환율 (직접 → 막히면 우회 통로로 재시도)
+  // 1순위: 실시간 시장 환율 (야후 파이낸스) — 구글/네이버에 나오는 그 환율
+  try{
+    const y = await fetchAny('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d', 6000);
+    const m = y && y.chart && y.chart.result && y.chart.result[0] && y.chart.result[0].meta;
+    if(m && m.regularMarketPrice){
+      const up = m.regularMarketTime ? new Date(m.regularMarketTime * 1000).toLocaleTimeString('ko-KR') : '';
+      return {rate: m.regularMarketPrice, src:'실시간', updated: up};
+    }
+  }catch(e){}
+  // 2순위: 두나무 기준환율
   try{ const r = parseDunamu(await fetchAny(DUNAMU, 5000)); if(r) return r; }catch(e){}
-  // 최후의 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
+  // 3순위(백업): 무료 환율 API (하루 1회만 갱신)
   const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
   return {rate: fx.rates.KRW, src:'백업·하루1회', updated: ''};
 }
