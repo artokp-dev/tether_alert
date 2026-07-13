@@ -11,7 +11,6 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
-<!-- 홈 화면 앱(전체화면) 설정 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -25,8 +24,8 @@
   .ex{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;}
   .ex + .ex{border-left:1px solid #1e1e2e;}
   .exname{font-size:14px;color:#aaa;letter-spacing:2px;font-weight:700;}
-  .kimp{font-size:clamp(30px,13vw,74px);font-weight:800;line-height:1;transition:opacity .3s;}
-  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;} .kimp.stale{opacity:.45;}
+  .kimp{font-size:clamp(30px,13vw,74px);font-weight:800;line-height:1;}
+  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;}
   .price{font-size:13px;color:#777;}
   .card{width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;}
   .spread{display:flex;justify-content:space-between;align-items:center;
@@ -44,7 +43,7 @@
   #alarmBtn.on{background:rgba(0,255,136,.12);color:#00ff88;border:1px solid #00ff88;}
   .sub{font-size:13px;color:#666;text-align:center;line-height:1.7;padding:0 12px;}
   .sub b{color:#aaa;}
-  .t{font-size:12px;color:#444;min-height:16px;}
+  .t{font-size:12px;color:#444;min-height:16px;text-align:center;}
   .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;
     text-align:center;padding:18px 12px;font-weight:800;font-size:16px;
     transform:translateY(-110%);transition:transform .3s;z-index:99;
@@ -85,21 +84,18 @@
   <div class="t" id="t"></div>
 
 <script>
-// 각 소스의 마지막 성공값 기억 → 순간 실패해도 화면 유지 (조회 실패 안 뜸)
-let lastUp = null, lastBi = null, lastRate = null, lastSrc = '', lastUpdated = '';
-// 알림 상태
+const VER = 'v7';
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
 const thrEl = document.getElementById('thr');
 thrEl.value = localStorage.getItem('kimp_thr') || '3';
 thrEl.onchange = () => localStorage.setItem('kimp_thr', thrEl.value);
 
-// 소리 알림은 사용자가 버튼을 눌러야 켜짐(브라우저 자동재생 정책)
 document.getElementById('alarmBtn').onclick = function(){
   try{
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if(audioCtx.state === 'suspended') audioCtx.resume();
-    beep(); // 테스트 삐 소리
+    beep();
   }catch(e){}
   if('Notification' in window && Notification.permission !== 'granted'){
     try{ Notification.requestPermission(); }catch(e){}
@@ -121,9 +117,9 @@ function beep(){
   o.start(now); o.stop(now + 0.17);
 }
 
-function fireAlert(sp){
-  const dir = lastUp > lastBi ? '업비트 > 빗썸' : '빗썸 > 업비트';
-  beep(); setTimeout(beep, 220); setTimeout(beep, 440);   // 삐-삐-삐
+function fireAlert(sp, up, bi){
+  const dir = up > bi ? '업비트 > 빗썸' : '빗썸 > 업비트';
+  beep(); setTimeout(beep, 220); setTimeout(beep, 440);
   if(navigator.vibrate) navigator.vibrate([200,100,200]);
   const f = document.getElementById('flash');
   f.textContent = `🚨 테더 차이 ${sp.toFixed(1)}원 (${dir})`;
@@ -132,113 +128,59 @@ function fireAlert(sp){
   if('Notification' in window && Notification.permission === 'granted'){
     try{
       new Notification('🚨 USDT 차익 ' + sp.toFixed(1) + '원', {
-        body: `업비트 ${lastUp.toLocaleString()}원 · 빗썸 ${lastBi.toLocaleString()}원 (${dir})`,
+        body: `업비트 ${up.toLocaleString()}원 · 빗썸 ${bi.toLocaleString()}원 (${dir})`,
         icon: 'icon-192.png'
       });
     }catch(e){}
   }
 }
 
-function fetchJson(url, ms){
-  const c = new AbortController();
-  const t = setTimeout(()=>c.abort(), ms || 4000);
-  return fetch(url,{signal:c.signal,cache:'no-store'})
-    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-    .finally(()=>clearTimeout(t));
-}
-
-// 직접 호출을 먼저 시도하고, 막히면(폰 CORS 등) 우회 통로로 재시도
-async function fetchAny(url, ms){
-  try{ return await fetchJson(url, ms); }
-  catch(e){
-    return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||4000)+3500);
-  }
-}
-
-async function getUpbit(){
-  const u = await fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT');
-  return u[0].trade_price;
-}
-async function getBithumb(){
-  const b = await fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW');
-  return parseFloat(b.data.closing_price);
-}
-function parseDunamu(fx){
-  const f0 = fx && fx[0];
-  if(f0 && f0.basePrice){
-    let up = '';
-    if(f0.timestamp) up = new Date(f0.timestamp).toLocaleTimeString('ko-KR');
-    else if(f0.date && f0.time) up = String(f0.time).slice(0,5);
-    return {rate: f0.basePrice, src:'두나무', updated: up};
-  }
-  return null;
-}
-
-async function getRate(){
-  const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
-  // 1순위: 실시간 시장 환율 (야후 파이낸스) — 구글/네이버에 나오는 그 환율
-  try{
-    const y = await fetchAny('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d', 6000);
-    const m = y && y.chart && y.chart.result && y.chart.result[0] && y.chart.result[0].meta;
-    if(m && m.regularMarketPrice){
-      const up = m.regularMarketTime ? new Date(m.regularMarketTime * 1000).toLocaleTimeString('ko-KR') : '';
-      return {rate: m.regularMarketPrice, src:'실시간', updated: up};
-    }
-  }catch(e){}
-  // 2순위: 두나무 기준환율
-  try{ const r = parseDunamu(await fetchAny(DUNAMU, 5000)); if(r) return r; }catch(e){}
-  // 3순위(백업): 무료 환율 API (하루 1회만 갱신)
-  const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
-  return {rate: fx.rates.KRW, src:'백업·하루1회', updated: ''};
-}
-
-function paint(elId, priceId, price, rate, fresh){
+function paint(elId, priceId, price, prem){
   const el = document.getElementById(elId);
-  if(price === null || rate === null){ return; }
-  const k = (price/rate - 1) * 100;
-  el.textContent = (k>=0?'+':'') + k.toFixed(2) + '%';
-  el.className = 'kimp ' + (k>=0?'pos':'neg') + (fresh ? '' : ' stale');
+  if(price == null || prem == null){ el.textContent = '—'; return; }
+  el.textContent = (prem>=0?'+':'') + prem.toFixed(2) + '%';
+  el.className = 'kimp ' + (prem>=0?'pos':'neg');
   document.getElementById(priceId).textContent = '테더 ' + price.toLocaleString() + '원';
 }
 
-async function load(){
-  let fUp=false, fBi=false, fRate=false;
-  await Promise.all([
-    getUpbit().then(v=>{lastUp=v; fUp=true;}).catch(()=>{}),
-    getBithumb().then(v=>{lastBi=v; fBi=true;}).catch(()=>{}),
-    getRate().then(o=>{lastRate=o.rate; lastSrc=o.src; lastUpdated=o.updated; fRate=true;}).catch(()=>{}),
-  ]);
-
-  if(lastRate === null || (lastUp === null && lastBi === null)){
-    document.getElementById('sub').textContent = '연결 재시도 중…';
+function render(d){
+  if(d.usd_krw == null){
+    document.getElementById('sub').textContent = '데이터 준비 중… (서버가 곧 자동 갱신)';
+    document.getElementById('t').textContent = VER;
     return;
   }
 
-  paint('upKimp','upPrice', lastUp, lastRate, fUp && fRate);
-  paint('biKimp','biPrice', lastBi, lastRate, fBi && fRate);
+  paint('upKimp','upPrice', d.upbit, d.upbit_premium);
+  paint('biKimp','biPrice', d.bithumb, d.bithumb_premium);
 
-  // 업비트·빗썸 테더 가격 차이 + 알림
-  if(lastUp !== null && lastBi !== null){
-    const sp = Math.abs(lastUp - lastBi);
+  if(d.spread != null && d.upbit != null && d.bithumb != null){
     const thr = parseFloat(thrEl.value) || 3;
-    document.getElementById('spreadVal').textContent = sp.toFixed(1) + '원';
-    document.getElementById('spreadBox').className = 'spread' + (sp >= thr ? ' hot' : '');
-    if(alarmOn && sp >= thr && Date.now() - lastAlert > 60000){
+    document.getElementById('spreadVal').textContent = d.spread.toFixed(1) + '원';
+    document.getElementById('spreadBox').className = 'spread' + (d.spread >= thr ? ' hot' : '');
+    if(alarmOn && d.spread >= thr && Date.now() - lastAlert > 60000){
       lastAlert = Date.now();
-      fireAlert(sp);
+      fireAlert(d.spread, d.upbit, d.bithumb);
     }
   }
 
   document.getElementById('sub').innerHTML =
-    `실제 환율 <b>${Number(lastRate).toLocaleString()}원</b> ` +
-    `(${lastSrc}${lastUpdated ? ' · ' + lastUpdated + ' 갱신' : ''})`;
-  const allFresh = fUp && fBi && fRate;
+    `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
+  const upd = d.updated ? new Date(d.updated).toLocaleTimeString('ko-KR') : '';
   document.getElementById('t').textContent =
-    new Date().toLocaleTimeString('ko-KR') + ' 기준' + (allFresh ? '' : ' · 일부 갱신 지연') + ' · v6';
+    (upd ? upd + ' 갱신' : '') + ' · 약 5분마다 자동 · ' + VER;
 }
 
-load();
-setInterval(load, 5000);
+async function poll(){
+  try{
+    const d = await fetch('./data.json?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
+    render(d);
+  }catch(e){
+    document.getElementById('sub').textContent = '데이터 불러오는 중…';
+  }
+}
+
+poll();
+setInterval(poll, 15000);   // data.json 을 15초마다 다시 읽음 (서버는 5분마다 갱신)
 </script>
 </body>
 </html>

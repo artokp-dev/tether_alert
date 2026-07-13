@@ -1,0 +1,30 @@
+name: update-data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 5분마다 (GitHub 최소 간격)
+  workflow_dispatch:         # 수동 실행 버튼
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch market data
+        run: python3 scripts/fetch_data.py
+
+      - name: Commit data.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git commit -m "chore: update market data [skip ci]" || echo "no change"
+          git push
