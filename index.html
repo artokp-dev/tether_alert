@@ -84,7 +84,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v7';
+const VER = 'v8';
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -143,44 +143,70 @@ function paint(elId, priceId, price, prem){
   document.getElementById(priceId).textContent = '테더 ' + price.toLocaleString() + '원';
 }
 
-function render(d){
-  if(d.usd_krw == null){
-    document.getElementById('sub').textContent = '데이터 준비 중… (서버가 곧 자동 갱신)';
+// 환율 = 서버(data.json), 가격 = 폰이 직접 실시간. 실패하면 서버값으로 대체.
+let rate = null, rateSrc = '', fbUp = null, fbBi = null;
+
+function fetchJson(url, ms){
+  const c = new AbortController();
+  const t = setTimeout(()=>c.abort(), ms || 3000);
+  return fetch(url, {signal:c.signal, cache:'no-store'})
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .finally(()=>clearTimeout(t));
+}
+// 직접 호출 실패 시 CORS 우회 통로로 재시도
+async function fetchAny(url, ms){
+  try{ return await fetchJson(url, ms); }
+  catch(e){ return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||3000)+3500); }
+}
+
+// 서버 data.json → 환율 + 예비 가격 (60초마다)
+async function loadServer(){
+  try{
+    const d = await fetch('./data.json?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
+    if(d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || ''; }
+    if(d.upbit != null) fbUp = d.upbit;
+    if(d.bithumb != null) fbBi = d.bithumb;
+  }catch(e){}
+}
+
+// 실시간 가격 (20초마다) → 김프 계산·표시
+async function tick(){
+  if(rate == null){
+    document.getElementById('sub').textContent = '환율 불러오는 중…';
     document.getElementById('t').textContent = VER;
     return;
   }
+  let up = fbUp, bi = fbBi;
+  await Promise.all([
+    fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT', 3000).then(u=>{ up = u[0].trade_price; }).catch(()=>{}),
+    fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW', 3000).then(b=>{ bi = parseFloat(b.data.closing_price); }).catch(()=>{}),
+  ]);
 
-  paint('upKimp','upPrice', d.upbit, d.upbit_premium);
-  paint('biKimp','biPrice', d.bithumb, d.bithumb_premium);
+  const upP = up != null ? (up/rate - 1) * 100 : null;
+  const biP = bi != null ? (bi/rate - 1) * 100 : null;
+  paint('upKimp','upPrice', up, upP);
+  paint('biKimp','biPrice', bi, biP);
 
-  if(d.spread != null && d.upbit != null && d.bithumb != null){
+  if(up != null && bi != null){
+    const sp = Math.abs(up - bi);
     const thr = parseFloat(thrEl.value) || 3;
-    document.getElementById('spreadVal').textContent = d.spread.toFixed(1) + '원';
-    document.getElementById('spreadBox').className = 'spread' + (d.spread >= thr ? ' hot' : '');
-    if(alarmOn && d.spread >= thr && Date.now() - lastAlert > 60000){
+    document.getElementById('spreadVal').textContent = sp.toFixed(1) + '원';
+    document.getElementById('spreadBox').className = 'spread' + (sp >= thr ? ' hot' : '');
+    if(alarmOn && sp >= thr && Date.now() - lastAlert > 60000){
       lastAlert = Date.now();
-      fireAlert(d.spread, d.upbit, d.bithumb);
+      fireAlert(sp, up, bi);
     }
   }
 
   document.getElementById('sub').innerHTML =
-    `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
-  const upd = d.updated ? new Date(d.updated).toLocaleTimeString('ko-KR') : '';
+    `실제 환율 <b>${Number(rate).toLocaleString()}원</b> (${rateSrc})`;
   document.getElementById('t').textContent =
-    (upd ? upd + ' 갱신' : '') + ' · 약 5분마다 자동 · ' + VER;
+    new Date().toLocaleTimeString('ko-KR') + ' · 실시간(20초) · ' + VER;
 }
 
-async function poll(){
-  try{
-    const d = await fetch('./data.json?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
-    render(d);
-  }catch(e){
-    document.getElementById('sub').textContent = '데이터 불러오는 중…';
-  }
-}
-
-poll();
-setInterval(poll, 15000);   // data.json 을 15초마다 다시 읽음 (서버는 5분마다 갱신)
+loadServer().then(tick);
+setInterval(loadServer, 60000);   // 환율은 60초마다 서버에서 (서버 자체는 5분마다 갱신)
+setInterval(tick, 20000);          // 가격은 20초마다 실시간
 </script>
 </body>
 </html>
