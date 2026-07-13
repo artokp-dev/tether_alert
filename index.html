@@ -144,12 +144,20 @@ function fetchJson(url, ms){
     .finally(()=>clearTimeout(t));
 }
 
+// 직접 호출을 먼저 시도하고, 막히면(폰 CORS 등) 우회 통로로 재시도
+async function fetchAny(url, ms){
+  try{ return await fetchJson(url, ms); }
+  catch(e){
+    return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||4000)+3500);
+  }
+}
+
 async function getUpbit(){
-  const u = await fetchJson('https://api.upbit.com/v1/ticker?markets=KRW-USDT');
+  const u = await fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT');
   return u[0].trade_price;
 }
 async function getBithumb(){
-  const b = await fetchJson('https://api.bithumb.com/public/ticker/USDT_KRW');
+  const b = await fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW');
   return parseFloat(b.data.closing_price);
 }
 function parseDunamu(fx){
@@ -165,14 +173,9 @@ function parseDunamu(fx){
 
 async function getRate(){
   const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
-  // 1) 두나무 직접 호출 (몇 분마다 갱신되는 실제 기준환율)
-  try{ const r = parseDunamu(await fetchJson(DUNAMU)); if(r) return r; }catch(e){}
-  // 2) 두나무를 CORS 우회 통로로 호출 (아이폰 등에서 직접 호출이 막힐 때)
-  try{
-    const r = parseDunamu(await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(DUNAMU), 7000));
-    if(r) return r;
-  }catch(e){}
-  // 3) 최후의 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
+  // 두나무 기준환율 (직접 → 막히면 우회 통로로 재시도)
+  try{ const r = parseDunamu(await fetchAny(DUNAMU, 5000)); if(r) return r; }catch(e){}
+  // 최후의 백업: 무료 환율 API (하루 1회만 갱신 → 값이 고정됨)
   const fx = await fetchJson('https://open.er-api.com/v6/latest/USD');
   return {rate: fx.rates.KRW, src:'백업·하루1회', updated: ''};
 }
