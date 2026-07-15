@@ -1,1 +1,1 @@
-{"upbit": 1470.0, "bithumb": 1469.0, "usd_krw": 1485.57, "rate_src": "실시간", "upbit_premium": -1.05, "bithumb_premium": -1.12, "spread": 1.0, "updated": 1784147563431, "errors": []}
+{"upbit": 1471.0, "bithumb": 1470.0, "usd_krw": null, "rate_src": null, "upbit_premium": null, "bithumb_premium": null, "spread": 1.0, "updated": 1784151218993, "errors": ["rate: <urlopen error [Errno -2] Name or service not known>"]}
