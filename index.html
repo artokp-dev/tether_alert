@@ -87,7 +87,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v11';
+const VER = 'v12';
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -148,6 +148,7 @@ function paint(elId, priceId, price, prem){
 
 // 환율 = 서버(data.json), 가격 = 폰이 직접 실시간. 실패하면 서버값으로 대체.
 let rate = null, rateSrc = '', fbUp = null, fbBi = null;
+let curUp = null, curBi = null;   // 현재 표시 중인 가격 (환율만 바뀌어도 다시 그리기 위함)
 
 function fetchJson(url, ms){
   const c = new AbortController();
@@ -156,10 +157,11 @@ function fetchJson(url, ms){
     .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .finally(()=>clearTimeout(t));
 }
-// 직접 호출 실패 시 CORS 우회 통로로 재시도
+// 직접 호출 실패 시 CORS 우회 통로(2개)로 재시도
 async function fetchAny(url, ms){
-  try{ return await fetchJson(url, ms); }
-  catch(e){ return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||3000)+3500); }
+  try{ return await fetchJson(url, ms); }catch(e){}
+  try{ return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||3000)+3500); }catch(e){}
+  return await fetchJson('https://corsproxy.io/?url=' + encodeURIComponent(url), (ms||3000)+3500);
 }
 
 // 환율 + 예비 가격 (60초마다)
@@ -167,9 +169,11 @@ const YAHOO = 'https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=
 const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
 async function loadServer(){
   let rateOk = false;
+  // 프록시가 옛 값을 캐시하지 못하도록 매번 주소를 다르게(cache-buster)
+  const cb = '&_t=' + Date.now();
   // 1) 24시간 시장환율 (야후 인터뱅크) — 평일엔 밤에도 갱신
   try{
-    const y = await fetchAny(YAHOO, 2500);
+    const y = await fetchAny(YAHOO + cb, 2500);
     const r0 = y && y.chart && y.chart.result && y.chart.result[0];
     const m = r0 && r0.meta;
     if(m && m.regularMarketPrice){ rate = m.regularMarketPrice; rateSrc = '시장환율'; rateOk = true; }
@@ -177,7 +181,7 @@ async function loadServer(){
   // 2) 하나은행 고시환율 (두나무 제공) — 시장환율 실패 시
   if(!rateOk){
     try{
-      const fx = await fetchAny(DUNAMU, 4000);
+      const fx = await fetchAny(DUNAMU + cb, 4000);
       if(fx && fx[0] && fx[0].basePrice){ rate = fx[0].basePrice; rateSrc = '하나은행'; rateOk = true; }
     }catch(e){}
   }
@@ -188,6 +192,7 @@ async function loadServer(){
     if(d.upbit != null) fbUp = d.upbit;
     if(d.bithumb != null) fbBi = d.bithumb;
   }catch(e){}
+  repaint();   // 새 환율을 즉시 화면에 반영 (다음 가격 갱신까지 안 기다림)
 }
 
 // 화면 그리기 (현재 rate + 주어진 가격으로)
@@ -219,6 +224,9 @@ function paintAll(up, bi){
     new Date().toLocaleTimeString('ko-KR') + ' · 실시간(20초) · ' + VER;
 }
 
+// 현재 값으로 다시 그리기 (환율이든 가격이든 뭐가 바뀌어도 호출)
+function repaint(){ paintAll(curUp, curBi); }
+
 // 실시간 가격 (20초마다) → 김프 계산·표시
 async function tick(){
   let up = fbUp, bi = fbBi;
@@ -226,7 +234,8 @@ async function tick(){
     fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT', 3000).then(u=>{ up = u[0].trade_price; }).catch(()=>{}),
     fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW', 3000).then(b=>{ bi = parseFloat(b.data.closing_price); }).catch(()=>{}),
   ]);
-  paintAll(up, bi);
+  curUp = up; curBi = bi;
+  repaint();
 }
 
 // 켤 때: 서버 저장값(같은 주소라 즉시)으로 화면 먼저 띄우고, 실시간은 뒤에서 갱신
@@ -236,7 +245,8 @@ async function tick(){
     if(d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || '서버'; }
     if(d.upbit != null) fbUp = d.upbit;
     if(d.bithumb != null) fbBi = d.bithumb;
-    paintAll(fbUp, fbBi);   // 1초 안에 첫 화면
+    curUp = fbUp; curBi = fbBi;
+    repaint();   // 1초 안에 첫 화면
   }catch(e){}
 
   loadServer();   // 실시간 환율 (백그라운드)
