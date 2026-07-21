@@ -84,7 +84,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v9';
+const VER = 'v10';
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -159,16 +159,26 @@ async function fetchAny(url, ms){
   catch(e){ return await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(url), (ms||3000)+3500); }
 }
 
-// 환율(하나은행 고시환율) + 예비 가격 (60초마다)
+// 환율 + 예비 가격 (60초마다)
+const YAHOO = 'https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d';
 const DUNAMU = 'https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD';
 async function loadServer(){
   let rateOk = false;
-  // 1) 하나은행 고시환율 — 두나무가 제공. 폰이 직접(→우회) 60초마다 받아 실시간 추적
+  // 1) 24시간 시장환율 (야후 인터뱅크) — 평일엔 밤에도 갱신
   try{
-    const fx = await fetchAny(DUNAMU, 4000);
-    if(fx && fx[0] && fx[0].basePrice){ rate = fx[0].basePrice; rateSrc = '하나은행'; rateOk = true; }
+    const y = await fetchAny(YAHOO, 5000);
+    const r0 = y && y.chart && y.chart.result && y.chart.result[0];
+    const m = r0 && r0.meta;
+    if(m && m.regularMarketPrice){ rate = m.regularMarketPrice; rateSrc = '시장환율'; rateOk = true; }
   }catch(e){}
-  // 2) 서버 data.json → 환율 백업 + 예비 가격(폰에서 시세가 막힐 때 대체용)
+  // 2) 하나은행 고시환율 (두나무 제공) — 시장환율 실패 시
+  if(!rateOk){
+    try{
+      const fx = await fetchAny(DUNAMU, 4000);
+      if(fx && fx[0] && fx[0].basePrice){ rate = fx[0].basePrice; rateSrc = '하나은행'; rateOk = true; }
+    }catch(e){}
+  }
+  // 3) 서버 data.json → 환율 백업 + 예비 가격(폰에서 시세가 막힐 때 대체용)
   try{
     const d = await fetch('./data.json?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
     if(!rateOk && d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || '서버'; }
