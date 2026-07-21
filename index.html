@@ -78,8 +78,15 @@
   </div>
 
   <div class="ctrl">
-    <label>알림 기준 <input id="thr" type="number" value="3" min="0.5" step="0.5" inputmode="decimal"></label>
+    <label>거래소 차이 <input id="thr" type="number" value="3" min="0.5" step="0.5" inputmode="decimal"></label>
     <span style="font-size:13px;color:#888">원 이상</span>
+  </div>
+  <div class="ctrl">
+    <label>김프 <input id="pHigh" type="number" value="0" step="0.1" inputmode="decimal">% 위</label>
+    <span style="font-size:13px;color:#888">또는</span>
+    <label><input id="pLow" type="number" value="-1.5" step="0.1" inputmode="decimal">% 아래</label>
+  </div>
+  <div class="ctrl">
     <button id="alarmBtn">🔔 소리 알림 켜기</button>
   </div>
 
@@ -87,12 +94,18 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v12';
-let alarmOn = false, audioCtx = null, lastAlert = 0;
+const VER = 'v13';
+let alarmOn = false, audioCtx = null, lastAlert = 0, lastPremAlert = 0;
 
 const thrEl = document.getElementById('thr');
+const pHighEl = document.getElementById('pHigh');
+const pLowEl = document.getElementById('pLow');
 thrEl.value = localStorage.getItem('kimp_thr') || '3';
+pHighEl.value = localStorage.getItem('kimp_pHigh') || '0';
+pLowEl.value = localStorage.getItem('kimp_pLow') || '-1.5';
 thrEl.onchange = () => localStorage.setItem('kimp_thr', thrEl.value);
+pHighEl.onchange = () => localStorage.setItem('kimp_pHigh', pHighEl.value);
+pLowEl.onchange = () => localStorage.setItem('kimp_pLow', pLowEl.value);
 
 document.getElementById('alarmBtn').onclick = function(){
   try{
@@ -106,6 +119,7 @@ document.getElementById('alarmBtn').onclick = function(){
   alarmOn = true;
   this.textContent = '🔔 알림 켜짐 ✅';
   this.classList.add('on');
+  repaint();   // 켜는 즉시 현재 값으로 조건 확인
 };
 
 function beep(){
@@ -120,22 +134,31 @@ function beep(){
   o.start(now); o.stop(now + 0.17);
 }
 
-function fireAlert(sp, up, bi){
-  const dir = up > bi ? '업비트 > 빗썸' : '빗썸 > 업비트';
+// 공통 알림: 소리 + 진동 + 화면 배너 + (권한 있으면) 시스템 알림
+function notify(banner, title, body){
   beep(); setTimeout(beep, 220); setTimeout(beep, 440);
   if(navigator.vibrate) navigator.vibrate([200,100,200]);
   const f = document.getElementById('flash');
-  f.textContent = `🚨 테더 차이 ${sp.toFixed(1)}원 (${dir})`;
+  f.textContent = banner;
   f.classList.add('show');
   setTimeout(()=>f.classList.remove('show'), 4000);
   if('Notification' in window && Notification.permission === 'granted'){
-    try{
-      new Notification('🚨 USDT 차익 ' + sp.toFixed(1) + '원', {
-        body: `업비트 ${up.toLocaleString()}원 · 빗썸 ${bi.toLocaleString()}원 (${dir})`,
-        icon: 'icon-192.png'
-      });
-    }catch(e){}
+    try{ new Notification(title, { body: body, icon: 'icon-192.png' }); }catch(e){}
   }
+}
+
+function fireAlert(sp, up, bi){
+  const dir = up > bi ? '업비트 > 빗썸' : '빗썸 > 업비트';
+  notify(`🚨 테더 차이 ${sp.toFixed(1)}원 (${dir})`,
+         '🚨 USDT 차익 ' + sp.toFixed(1) + '원',
+         `업비트 ${up.toLocaleString()}원 · 빗썸 ${bi.toLocaleString()}원 (${dir})`);
+}
+
+function firePremium(avg){
+  const arrow = avg >= 0 ? '▲' : '▼';
+  notify(`${arrow} 김치 프리미엄 ${avg.toFixed(2)}%`,
+         `${arrow} 김프 ${avg.toFixed(2)}%`,
+         `설정 기준 도달 (${pLowEl.value}% 아래 또는 ${pHighEl.value}% 위)`);
 }
 
 function paint(elId, priceId, price, prem){
@@ -215,6 +238,19 @@ function paintAll(up, bi){
     if(alarmOn && sp >= thr && Date.now() - lastAlert > 60000){
       lastAlert = Date.now();
       fireAlert(sp, up, bi);
+    }
+  }
+
+  // 김프 알림 (설정한 상단% 위 또는 하단% 아래)
+  const prems = [upP, biP].filter(v => v != null);
+  if(alarmOn && prems.length){
+    const avg = prems.reduce((a,b)=>a+b,0) / prems.length;
+    const pHigh = parseFloat(pHighEl.value);
+    const pLow = parseFloat(pLowEl.value);
+    const hit = (!isNaN(pHigh) && avg >= pHigh) || (!isNaN(pLow) && avg <= pLow);
+    if(hit && Date.now() - lastPremAlert > 60000){
+      lastPremAlert = Date.now();
+      firePremium(avg);
     }
   }
 
