@@ -24,17 +24,16 @@ def get_bithumb():
 
 
 def get_rate():
-    # 1순위: 야후 파이낸스 실시간 시장 환율 (구글/네이버와 동일)
+    # 1순위: 하나은행 고시환율 (두나무 제공, 국내 김프 표준)
     try:
-        y = get("https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d")
-        m = y["chart"]["result"][0]["meta"]
-        if m.get("regularMarketPrice"):
-            return float(m["regularMarketPrice"]), "실시간"
+        d = get("https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD")
+        if d and d[0].get("basePrice"):
+            return float(d[0]["basePrice"]), "하나은행"
     except Exception:
         pass
-    # 2순위: 두나무 기준환율
-    d = get("https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD")
-    return float(d[0]["basePrice"]), "두나무"
+    # 2순위: 야후 파이낸스 실시간 시장 환율
+    y = get("https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d")
+    return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"]), "실시간"
 
 
 def main():
