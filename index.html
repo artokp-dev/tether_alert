@@ -8,6 +8,9 @@
 <meta http-equiv="Expires" content="0">
 <title>김치 프리미엄</title>
 <meta name="theme-color" content="#0a0a0f">
+<link rel="preconnect" href="https://api.upbit.com">
+<link rel="preconnect" href="https://api.bithumb.com">
+<link rel="preconnect" href="https://api.allorigins.win">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
@@ -84,7 +87,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v10';
+const VER = 'v11';
 let alarmOn = false, audioCtx = null, lastAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -166,7 +169,7 @@ async function loadServer(){
   let rateOk = false;
   // 1) 24시간 시장환율 (야후 인터뱅크) — 평일엔 밤에도 갱신
   try{
-    const y = await fetchAny(YAHOO, 5000);
+    const y = await fetchAny(YAHOO, 2500);
     const r0 = y && y.chart && y.chart.result && y.chart.result[0];
     const m = r0 && r0.meta;
     if(m && m.regularMarketPrice){ rate = m.regularMarketPrice; rateSrc = '시장환율'; rateOk = true; }
@@ -187,19 +190,13 @@ async function loadServer(){
   }catch(e){}
 }
 
-// 실시간 가격 (20초마다) → 김프 계산·표시
-async function tick(){
+// 화면 그리기 (현재 rate + 주어진 가격으로)
+function paintAll(up, bi){
   if(rate == null){
-    document.getElementById('sub').textContent = '환율 불러오는 중…';
+    document.getElementById('sub').textContent = '불러오는 중…';
     document.getElementById('t').textContent = VER;
     return;
   }
-  let up = fbUp, bi = fbBi;
-  await Promise.all([
-    fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT', 3000).then(u=>{ up = u[0].trade_price; }).catch(()=>{}),
-    fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW', 3000).then(b=>{ bi = parseFloat(b.data.closing_price); }).catch(()=>{}),
-  ]);
-
   const upP = up != null ? (up/rate - 1) * 100 : null;
   const biP = bi != null ? (bi/rate - 1) * 100 : null;
   paint('upKimp','upPrice', up, upP);
@@ -222,9 +219,31 @@ async function tick(){
     new Date().toLocaleTimeString('ko-KR') + ' · 실시간(20초) · ' + VER;
 }
 
-loadServer().then(tick);
-setInterval(loadServer, 60000);   // 환율은 60초마다 서버에서 (서버 자체는 5분마다 갱신)
-setInterval(tick, 20000);          // 가격은 20초마다 실시간
+// 실시간 가격 (20초마다) → 김프 계산·표시
+async function tick(){
+  let up = fbUp, bi = fbBi;
+  await Promise.all([
+    fetchAny('https://api.upbit.com/v1/ticker?markets=KRW-USDT', 3000).then(u=>{ up = u[0].trade_price; }).catch(()=>{}),
+    fetchAny('https://api.bithumb.com/public/ticker/USDT_KRW', 3000).then(b=>{ bi = parseFloat(b.data.closing_price); }).catch(()=>{}),
+  ]);
+  paintAll(up, bi);
+}
+
+// 켤 때: 서버 저장값(같은 주소라 즉시)으로 화면 먼저 띄우고, 실시간은 뒤에서 갱신
+(async function init(){
+  try{
+    const d = await fetch('./data.json?t=' + Date.now(), {cache:'no-store'}).then(r=>r.json());
+    if(d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || '서버'; }
+    if(d.upbit != null) fbUp = d.upbit;
+    if(d.bithumb != null) fbBi = d.bithumb;
+    paintAll(fbUp, fbBi);   // 1초 안에 첫 화면
+  }catch(e){}
+
+  loadServer();   // 실시간 환율 (백그라운드)
+  tick();          // 실시간 가격
+  setInterval(loadServer, 60000);
+  setInterval(tick, 20000);
+})();
 </script>
 </body>
 </html>
