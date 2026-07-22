@@ -95,7 +95,7 @@
   </div>
 
 <script>
-const VER = 'srv1';
+const VER = 'srv2';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -129,26 +129,47 @@ async function poll(){
   }
 }
 
-async function loadSettings(){
-  try{
-    const s = await fetch('/api/settings').then(r=>r.json());
-    enabledEl.checked = !!s.enabled;
-    thrEl.value = s.spread;
-    pHighEl.value = s.kimp_high;
-    pLowEl.value = s.kimp_low;
-  }catch(e){}
+function fillInputs(s){
+  enabledEl.checked = !!s.enabled;
+  thrEl.value = s.spread;
+  pHighEl.value = s.kimp_high;
+  pLowEl.value = s.kimp_low;
 }
-
-let saveTimer = null;
-async function saveSettings(){
-  const body = {
+function currentSettings(){
+  return {
     enabled: enabledEl.checked,
     spread: parseFloat(thrEl.value),
     kimp_high: parseFloat(pHighEl.value),
     kimp_low: parseFloat(pLowEl.value),
   };
+}
+function readLocal(){ try{ return JSON.parse(localStorage.getItem('kimp_settings') || 'null'); }catch(e){ return null; } }
+function writeLocal(s){ try{ localStorage.setItem('kimp_settings', JSON.stringify(s)); }catch(e){} }
+
+async function pushToServer(body){
+  return fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+}
+
+// 시작 시: 폰에 저장된 설정이 있으면 서버에 복원(재시작 대비), 없으면 서버값을 가져옴
+async function initSettings(){
+  const local = readLocal();
+  if(local){
+    fillInputs(local);
+    try{ await pushToServer(local); }catch(e){}
+  }else{
+    try{
+      const s = await fetch('/api/settings').then(r=>r.json());
+      fillInputs(s); writeLocal(s);
+    }catch(e){}
+  }
+}
+
+let saveTimer = null;
+async function saveSettings(){
+  const body = currentSettings();
+  writeLocal(body);   // 폰에도 저장 (서버 재시작돼도 다음 접속 때 자동 복원)
   try{
-    await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    await pushToServer(body);
     const m = document.getElementById('savemsg');
     m.textContent = '저장됨 ✓';
     clearTimeout(saveTimer);
@@ -170,7 +191,7 @@ document.getElementById('testBtn').onclick = async function(){
 };
 
 (async function init(){
-  await loadSettings();
+  await initSettings();
   poll();
   setInterval(poll, 10000);
 })();
