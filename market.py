@@ -36,22 +36,53 @@ def get_intl_gold_usd_oz():
     return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
 
+NAVER_GOLD_URLS = [
+    "https://api.stock.naver.com/marketindex/metals/M04020000/prices?page=1&pageSize=1",
+    "https://api.stock.naver.com/marketindex/metals/M04020000",
+    "https://m.stock.naver.com/front-api/v1/marketIndex/prices?category=metals&reutersCode=M04020000&page=1&pageSize=1",
+    "https://polling.finance.naver.com/api/realtime/marketindex/metals/M04020000",
+]
+_GOLD_KEYS = ("closePrice", "nowVal", "closeVal", "closePriceKrw", "price", "amount", "value")
+
+
+def _find_gold_price(obj, keys=_GOLD_KEYS):
+    """JSON 안에서 원/g 가격을 재귀로 찾음 (상식 범위 5만~100만 원)."""
+    if isinstance(obj, dict):
+        for k in keys:
+            if k in obj and obj[k] not in (None, ""):
+                try:
+                    v = _to_float(obj[k])
+                    if 50000 < v < 1000000:
+                        return v
+                except Exception:
+                    pass
+        for v in obj.values():
+            r = _find_gold_price(v, keys)
+            if r:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _find_gold_price(v, keys)
+            if r:
+                return r
+    return None
+
+
 def get_domestic_gold_krw_g():
-    """국내 금 시세 (원 / g) — 네이버가 제공하는 KRX 금현물."""
+    """국내 금 시세 (원 / g) — 네이버가 제공하는 KRX 금현물 (여러 엔드포인트 시도)."""
     headers = dict(UA)
     headers["Referer"] = "https://m.stock.naver.com/"
-    r = requests.get(NAVER_GOLD, headers=headers, timeout=8)
-    r.raise_for_status()
-    j = r.json()
-    res = j.get("result", j)
-    if isinstance(res, dict):
-        res = res.get("prices") or res.get("list") or res.get("datas") or [res]
-    item = res[0]
-    for k in ("closePrice", "nowVal", "closeVal", "price", "closePriceKrw"):
-        v = item.get(k)
-        if v not in (None, ""):
-            return _to_float(v)
-    raise ValueError("gold price field not found in Naver response")
+    last = None
+    for u in NAVER_GOLD_URLS:
+        try:
+            r = requests.get(u, headers=headers, timeout=8)
+            r.raise_for_status()
+            p = _find_gold_price(r.json())
+            if p:
+                return p
+        except Exception as e:  # noqa: BLE001
+            last = e
+    raise last or ValueError("no domestic gold endpoint returned a usable price")
 
 
 def get_upbit():
