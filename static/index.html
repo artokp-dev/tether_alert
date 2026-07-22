@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>김치 프리미엄</title>
+<meta name="theme-color" content="#0a0a0f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="김프">
+<style>
+  html,body{margin:0;min-height:100%;background:#0a0a0f;color:#fff;
+    font-family:-apple-system,'Malgun Gothic',sans-serif;
+    display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 0 40px;box-sizing:border-box;}
+  .wrap{width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;align-items:center;}
+  .label{font-size:15px;color:#888;letter-spacing:3px;}
+  .row{display:flex;width:100%;}
+  .ex{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;}
+  .ex + .ex{border-left:1px solid #1e1e2e;}
+  .exname{font-size:14px;color:#aaa;letter-spacing:2px;font-weight:700;}
+  .kimp{font-size:clamp(30px,13vw,74px);font-weight:800;line-height:1;}
+  .kimp.pos{color:#ff4d5e;} .kimp.neg{color:#3d9bff;}
+  .price{font-size:13px;color:#777;}
+  .spread{width:100%;display:flex;justify-content:space-between;align-items:center;
+    background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:14px 16px;box-sizing:border-box;}
+  .spread .lbl{font-size:13px;color:#888;}
+  .spread .v{font-weight:800;font-size:22px;font-family:'Menlo',monospace;color:#e8e8f5;}
+  .spread.hot{border-color:#ff4d5e;background:rgba(255,77,94,.08);}
+  .spread.hot .v{color:#ff4d5e;}
+  .card{width:100%;background:#12121a;border:1px solid #1e1e2e;border-radius:14px;padding:16px;box-sizing:border-box;}
+  .card h2{font-size:12px;color:#888;letter-spacing:2px;margin:0 0 14px;text-transform:uppercase;font-weight:700;}
+  .set{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0;font-size:14px;color:#ccc;}
+  .set input[type=number]{width:66px;background:#0a0a0f;border:1px solid #1e1e2e;color:#fff;
+    border-radius:8px;padding:9px;font-size:15px;text-align:center;}
+  .set .two{display:flex;gap:6px;align-items:center;}
+  .set .two input{width:56px;}
+  .switch{position:relative;width:48px;height:28px;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#333;border-radius:20px;transition:.2s;cursor:pointer;}
+  .slider:before{content:"";position:absolute;height:22px;width:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider{background:#00ff88;}
+  .switch input:checked + .slider:before{transform:translateX(20px);}
+  .btn{width:100%;padding:12px;border-radius:10px;border:1px solid #ffcc00;background:transparent;
+    color:#ffcc00;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;}
+  .savemsg{font-size:12px;color:#00ff88;min-height:16px;text-align:center;}
+  .sub{font-size:13px;color:#666;text-align:center;line-height:1.7;}
+  .sub b{color:#aaa;}
+  .t{font-size:12px;color:#444;min-height:16px;text-align:center;}
+  .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;text-align:center;
+    padding:16px;font-weight:800;font-size:15px;transform:translateY(-110%);transition:.3s;z-index:99;}
+  .flash.show{transform:translateY(0);}
+</style>
+</head>
+<body>
+  <div class="flash" id="flash"></div>
+  <div class="wrap">
+    <div class="label">김치 프리미엄</div>
+    <div class="row">
+      <div class="ex"><div class="exname">업비트</div><div class="kimp" id="upKimp">…</div><div class="price" id="upPrice"></div></div>
+      <div class="ex"><div class="exname">빗썸</div><div class="kimp" id="biKimp">…</div><div class="price" id="biPrice"></div></div>
+    </div>
+    <div class="spread" id="spreadBox">
+      <span class="lbl">업비트·빗썸 테더 차이</span><span class="v" id="spreadVal">—</span>
+    </div>
+    <div class="sub" id="sub">불러오는 중…</div>
+
+    <div class="card">
+      <h2>알림 설정 (앱 꺼도 텔레그램으로 옴)</h2>
+      <div class="set">
+        <span>알림 켜기</span>
+        <label class="switch"><input type="checkbox" id="enabled"><span class="slider"></span></label>
+      </div>
+      <div class="set">
+        <span>거래소 차이</span>
+        <span class="two"><input type="number" id="thr" step="0.5" inputmode="decimal"> 원 이상</span>
+      </div>
+      <div class="set">
+        <span>김프 상단</span>
+        <span class="two"><input type="number" id="pHigh" step="0.1" inputmode="decimal"> % 위</span>
+      </div>
+      <div class="set">
+        <span>김프 하단</span>
+        <span class="two"><input type="number" id="pLow" step="0.1" inputmode="decimal"> % 아래</span>
+      </div>
+      <div class="savemsg" id="savemsg"></div>
+      <button class="btn" id="testBtn">📱 텔레그램 테스트</button>
+    </div>
+
+    <div class="t" id="t"></div>
+  </div>
+
+<script>
+const VER = 'srv1';
+const enabledEl = document.getElementById('enabled');
+const thrEl = document.getElementById('thr');
+const pHighEl = document.getElementById('pHigh');
+const pLowEl = document.getElementById('pLow');
+
+function paint(elId, priceId, price, prem){
+  const el = document.getElementById(elId);
+  if(price == null || prem == null){ el.textContent = '—'; return; }
+  el.textContent = (prem>=0?'+':'') + prem.toFixed(2) + '%';
+  el.className = 'kimp ' + (prem>=0?'pos':'neg');
+  document.getElementById(priceId).textContent = '테더 ' + price.toLocaleString() + '원';
+}
+
+async function poll(){
+  try{
+    const d = await fetch('/api/prices', {cache:'no-store'}).then(r=>r.json());
+    if(d.usd_krw == null){ document.getElementById('sub').textContent = '데이터 준비 중…'; return; }
+    paint('upKimp','upPrice', d.upbit, d.upbit_premium);
+    paint('biKimp','biPrice', d.bithumb, d.bithumb_premium);
+    if(d.spread != null){
+      const thr = parseFloat(thrEl.value) || 3;
+      document.getElementById('spreadVal').textContent = d.spread.toFixed(1) + '원';
+      document.getElementById('spreadBox').className = 'spread' + (d.spread >= thr ? ' hot' : '');
+    }
+    document.getElementById('sub').innerHTML =
+      `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
+    document.getElementById('t').textContent =
+      new Date().toLocaleTimeString('ko-KR') + ' · 서버 실시간 · ' + VER;
+  }catch(e){
+    document.getElementById('sub').textContent = '서버 연결 중…';
+  }
+}
+
+async function loadSettings(){
+  try{
+    const s = await fetch('/api/settings').then(r=>r.json());
+    enabledEl.checked = !!s.enabled;
+    thrEl.value = s.spread;
+    pHighEl.value = s.kimp_high;
+    pLowEl.value = s.kimp_low;
+  }catch(e){}
+}
+
+let saveTimer = null;
+async function saveSettings(){
+  const body = {
+    enabled: enabledEl.checked,
+    spread: parseFloat(thrEl.value),
+    kimp_high: parseFloat(pHighEl.value),
+    kimp_low: parseFloat(pLowEl.value),
+  };
+  try{
+    await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const m = document.getElementById('savemsg');
+    m.textContent = '저장됨 ✓';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(()=>{ m.textContent = ''; }, 1500);
+  }catch(e){
+    document.getElementById('savemsg').textContent = '저장 실패';
+  }
+}
+
+[enabledEl, thrEl, pHighEl, pLowEl].forEach(el => el.addEventListener('change', saveSettings));
+
+document.getElementById('testBtn').onclick = async function(){
+  this.disabled = true; this.textContent = '전송 중…';
+  try{
+    const j = await fetch('/api/test-alert', {method:'POST'}).then(r=>r.json());
+    document.getElementById('savemsg').textContent = j.ok ? '텔레그램 전송됨 ✓' : '전송 실패 - 토큰 확인';
+  }catch(e){ document.getElementById('savemsg').textContent = '오류'; }
+  this.disabled = false; this.textContent = '📱 텔레그램 테스트';
+};
+
+(async function init(){
+  await loadSettings();
+  poll();
+  setInterval(poll, 10000);
+})();
+</script>
+</body>
+</html>
