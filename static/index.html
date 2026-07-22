@@ -51,6 +51,14 @@
   .sub{font-size:13px;color:#666;text-align:center;line-height:1.7;}
   .sub b{color:#aaa;}
   .t{font-size:12px;color:#444;min-height:16px;text-align:center;}
+  .goldrow{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .gitem{text-align:center;flex:1;}
+  .gname{font-size:12px;color:#888;}
+  .gval{font-family:'Menlo',monospace;font-size:16px;font-weight:700;color:#e8e8f5;margin-top:4px;}
+  .gunit{font-size:10px;color:#666;}
+  .gprem{font-size:clamp(26px,10vw,48px);font-weight:800;line-height:1;color:#888;}
+  .gprem.pos{color:#ffcc00;} .gprem.neg{color:#3d9bff;}
+  .gsub{font-size:11px;color:#666;text-align:center;margin-top:12px;}
   .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;text-align:center;
     padding:16px;font-weight:800;font-size:15px;transform:translateY(-110%);transition:.3s;z-index:99;}
   .flash.show{transform:translateY(0);}
@@ -68,6 +76,16 @@
       <span class="lbl">업비트·빗썸 테더 차이</span><span class="v" id="spreadVal">—</span>
     </div>
     <div class="sub" id="sub">불러오는 중…</div>
+
+    <div class="card">
+      <h2>금 김치 프리미엄 (국내 KRX vs 국제)</h2>
+      <div class="goldrow">
+        <div class="gitem"><div class="gname">국내 금</div><div class="gval" id="goldDom">—</div><div class="gunit">원 / g</div></div>
+        <div class="gitem"><div class="gprem" id="goldPrem">—</div></div>
+        <div class="gitem"><div class="gname">국제(환산)</div><div class="gval" id="goldIntl">—</div><div class="gunit">원 / g</div></div>
+      </div>
+      <div class="gsub" id="goldSub"></div>
+    </div>
 
     <div class="card">
       <h2>알림 설정 (앱 꺼도 텔레그램으로 옴)</h2>
@@ -120,6 +138,7 @@ async function poll(){
       document.getElementById('spreadVal').textContent = d.spread.toFixed(1) + '원';
       document.getElementById('spreadBox').className = 'spread' + (d.spread >= thr ? ' hot' : '');
     }
+    renderGold(d);
     document.getElementById('sub').innerHTML =
       `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
     document.getElementById('t').textContent =
@@ -127,6 +146,24 @@ async function poll(){
   }catch(e){
     document.getElementById('sub').textContent = '서버 연결 중…';
   }
+}
+
+function renderGold(d){
+  const dom = document.getElementById('goldDom');
+  const intl = document.getElementById('goldIntl');
+  const prem = document.getElementById('goldPrem');
+  const gsub = document.getElementById('goldSub');
+  dom.textContent  = d.gold_domestic != null ? Number(d.gold_domestic).toLocaleString() : '—';
+  intl.textContent = d.gold_intl_krw_g != null ? Number(d.gold_intl_krw_g).toLocaleString() : '—';
+  if(d.gold_premium != null){
+    prem.textContent = (d.gold_premium>=0?'+':'') + d.gold_premium.toFixed(2) + '%';
+    prem.className = 'gprem ' + (d.gold_premium>=0?'pos':'neg');
+  }else{
+    prem.textContent = '—'; prem.className = 'gprem';
+  }
+  gsub.textContent = d.gold_intl_usd_oz != null
+    ? `국제 금 $${Number(d.gold_intl_usd_oz).toLocaleString()}/oz · 1oz=31.1035g`
+    : '금 시세 불러오는 중…';
 }
 
 function fillInputs(s){

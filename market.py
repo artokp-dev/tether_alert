@@ -12,11 +12,46 @@ BITHUMB = "https://api.bithumb.com/public/ticker/USDT_KRW"
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d"
 DUNAMU = "https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD"
 
+# 금(Gold)
+G_PER_OZT = 31.1034768   # 1 트로이온스 = 31.1034768 g
+YAHOO_GOLD = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"  # 국제 금 (USD/oz)
+# 네이버가 제공하는 국내 금(KRX 금현물, 원/g)
+NAVER_GOLD = ("https://m.stock.naver.com/front-api/v1/marketIndex/prices"
+              "?page=1&category=metals&reutersCode=M04020000&pageSize=1")
+
 
 def _get(url):
     r = requests.get(url, headers=UA, timeout=8)
     r.raise_for_status()
     return r.json()
+
+
+def _to_float(x):
+    return float(str(x).replace(",", "").strip())
+
+
+def get_intl_gold_usd_oz():
+    """국제 금 시세 (USD / 트로이온스) — 야후 금 선물 GC=F."""
+    y = _get(YAHOO_GOLD)
+    return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
+
+
+def get_domestic_gold_krw_g():
+    """국내 금 시세 (원 / g) — 네이버가 제공하는 KRX 금현물."""
+    headers = dict(UA)
+    headers["Referer"] = "https://m.stock.naver.com/"
+    r = requests.get(NAVER_GOLD, headers=headers, timeout=8)
+    r.raise_for_status()
+    j = r.json()
+    res = j.get("result", j)
+    if isinstance(res, dict):
+        res = res.get("prices") or res.get("list") or res.get("datas") or [res]
+    item = res[0]
+    for k in ("closePrice", "nowVal", "closeVal", "price", "closePriceKrw"):
+        v = item.get(k)
+        if v not in (None, ""):
+            return _to_float(v)
+    raise ValueError("gold price field not found in Naver response")
 
 
 def get_upbit():
@@ -48,7 +83,11 @@ def fetch_market():
     out = {
         "upbit": None, "bithumb": None, "usd_krw": None, "rate_src": None,
         "upbit_premium": None, "bithumb_premium": None, "avg_premium": None,
-        "spread": None, "updated": int(time.time() * 1000), "errors": [],
+        "spread": None,
+        # 금
+        "gold_domestic": None, "gold_intl_usd_oz": None,
+        "gold_intl_krw_g": None, "gold_premium": None,
+        "updated": int(time.time() * 1000), "errors": [],
     }
     try:
         out["upbit"] = get_upbit()
@@ -70,6 +109,21 @@ def fetch_market():
     out["avg_premium"] = round(sum(prems) / len(prems), 2) if prems else None
     if out["upbit"] and out["bithumb"]:
         out["spread"] = round(abs(out["upbit"] - out["bithumb"]), 1)
+
+    # --- 금 김치 프리미엄 (실패해도 나머지는 유지) ---
+    try:
+        out["gold_intl_usd_oz"] = get_intl_gold_usd_oz()
+    except Exception as e:
+        out["errors"].append(f"gold_intl: {e}")
+    try:
+        out["gold_domestic"] = get_domestic_gold_krw_g()
+    except Exception as e:
+        out["errors"].append(f"gold_domestic: {e}")
+    if out["gold_intl_usd_oz"] and rate:
+        out["gold_intl_krw_g"] = round(out["gold_intl_usd_oz"] * rate / G_PER_OZT, 1)
+    if out["gold_domestic"] and out["gold_intl_krw_g"]:
+        out["gold_premium"] = round((out["gold_domestic"] / out["gold_intl_krw_g"] - 1) * 100, 2)
+
     return out
 
 

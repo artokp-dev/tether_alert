@@ -37,6 +37,16 @@
   .spread .v{font-weight:800;font-size:22px;font-family:'Menlo',monospace;color:#e8e8f5;}
   .spread.hot{border-color:#ff4d5e;background:rgba(255,77,94,.08);}
   .spread.hot .v{color:#ff4d5e;}
+  .goldbox{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:14px 16px;}
+  .goldbox h3{font-size:11px;color:#888;letter-spacing:1px;margin:0 0 10px;font-weight:700;}
+  .goldrow{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .gitem{text-align:center;flex:1;}
+  .gname{font-size:12px;color:#888;}
+  .gval{font-family:'Menlo',monospace;font-size:15px;font-weight:700;color:#e8e8f5;margin-top:3px;}
+  .gunit{font-size:10px;color:#666;}
+  .gprem{font-size:clamp(24px,9vw,42px);font-weight:800;line-height:1;color:#888;}
+  .gprem.pos{color:#ffcc00;} .gprem.neg{color:#3d9bff;}
+  .gsub{font-size:11px;color:#666;text-align:center;margin-top:10px;}
   .ctrl{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}
   .ctrl label{font-size:13px;color:#888;}
   .ctrl input{width:52px;background:#12121a;border:1px solid #1e1e2e;color:#fff;
@@ -77,6 +87,18 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="goldbox">
+      <h3>금 김치 프리미엄 (국내 KRX vs 국제)</h3>
+      <div class="goldrow">
+        <div class="gitem"><div class="gname">국내 금</div><div class="gval" id="goldDom">—</div><div class="gunit">원/g</div></div>
+        <div class="gitem"><div class="gprem" id="goldPrem">—</div></div>
+        <div class="gitem"><div class="gname">국제(환산)</div><div class="gval" id="goldIntl">—</div><div class="gunit">원/g</div></div>
+      </div>
+      <div class="gsub" id="goldSub"></div>
+    </div>
+  </div>
+
   <div class="ctrl">
     <label>거래소 차이 <input id="thr" type="number" value="3" min="0.5" step="0.5" inputmode="decimal"></label>
     <span style="font-size:13px;color:#888">원 이상</span>
@@ -94,7 +116,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v13';
+const VER = 'v14';
 let alarmOn = false, audioCtx = null, lastAlert = 0, lastPremAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -172,6 +194,7 @@ function paint(elId, priceId, price, prem){
 // 환율 = 서버(data.json), 가격 = 폰이 직접 실시간. 실패하면 서버값으로 대체.
 let rate = null, rateSrc = '', fbUp = null, fbBi = null;
 let curUp = null, curBi = null;   // 현재 표시 중인 가격 (환율만 바뀌어도 다시 그리기 위함)
+let gold = {};                    // 금 데이터 (data.json 에서, 약 5분마다 갱신)
 
 function fetchJson(url, ms){
   const c = new AbortController();
@@ -214,8 +237,27 @@ async function loadServer(){
     if(!rateOk && d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || '서버'; }
     if(d.upbit != null) fbUp = d.upbit;
     if(d.bithumb != null) fbBi = d.bithumb;
+    gold = { dom: d.gold_domestic, intl: d.gold_intl_krw_g, prem: d.gold_premium, oz: d.gold_intl_usd_oz };
+    renderGold();
   }catch(e){}
   repaint();   // 새 환율을 즉시 화면에 반영 (다음 가격 갱신까지 안 기다림)
+}
+
+function renderGold(){
+  const domEl = document.getElementById('goldDom');
+  const intlEl = document.getElementById('goldIntl');
+  const premEl = document.getElementById('goldPrem');
+  const subEl = document.getElementById('goldSub');
+  if(!domEl) return;
+  domEl.textContent  = gold.dom  != null ? Number(gold.dom).toLocaleString()  : '—';
+  intlEl.textContent = gold.intl != null ? Number(gold.intl).toLocaleString() : '—';
+  if(gold.prem != null){
+    premEl.textContent = (gold.prem>=0?'+':'') + gold.prem.toFixed(2) + '%';
+    premEl.className = 'gprem ' + (gold.prem>=0?'pos':'neg');
+  }else{
+    premEl.textContent = '—'; premEl.className = 'gprem';
+  }
+  subEl.textContent = gold.oz != null ? `국제 금 $${Number(gold.oz).toLocaleString()}/oz · 약 5분마다` : '금 시세 불러오는 중…';
 }
 
 // 화면 그리기 (현재 rate + 주어진 가격으로)

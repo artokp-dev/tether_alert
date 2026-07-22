@@ -9,10 +9,38 @@ import urllib.request
 UA = {"User-Agent": "Mozilla/5.0 (KimchiPremiumTracker)"}
 
 
-def get(url, timeout=15):
-    req = urllib.request.Request(url, headers=UA)
+G_PER_OZT = 31.1034768
+
+
+def get(url, timeout=15, headers=None):
+    req = urllib.request.Request(url, headers=headers or UA)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read().decode())
+
+
+def _to_float(x):
+    return float(str(x).replace(",", "").strip())
+
+
+def get_intl_gold_usd_oz():
+    y = get("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d")
+    return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
+
+
+def get_domestic_gold_krw_g():
+    url = ("https://m.stock.naver.com/front-api/v1/marketIndex/prices"
+           "?page=1&category=metals&reutersCode=M04020000&pageSize=1")
+    h = dict(UA); h["Referer"] = "https://m.stock.naver.com/"
+    j = get(url, headers=h)
+    res = j.get("result", j)
+    if isinstance(res, dict):
+        res = res.get("prices") or res.get("list") or res.get("datas") or [res]
+    item = res[0]
+    for k in ("closePrice", "nowVal", "closeVal", "price", "closePriceKrw"):
+        v = item.get(k)
+        if v not in (None, ""):
+            return _to_float(v)
+    raise ValueError("gold price field not found")
 
 
 def get_upbit():
@@ -41,6 +69,8 @@ def main():
     data = {
         "upbit": None, "bithumb": None, "usd_krw": None, "rate_src": None,
         "upbit_premium": None, "bithumb_premium": None, "spread": None,
+        "gold_domestic": None, "gold_intl_usd_oz": None,
+        "gold_intl_krw_g": None, "gold_premium": None,
         "updated": int(time.time() * 1000), "errors": [],
     }
 
@@ -66,6 +96,20 @@ def main():
     data["bithumb_premium"] = prem(data["bithumb"])
     if data["upbit"] and data["bithumb"]:
         data["spread"] = round(abs(data["upbit"] - data["bithumb"]), 1)
+
+    # 금 김치 프리미엄
+    try:
+        data["gold_intl_usd_oz"] = get_intl_gold_usd_oz()
+    except Exception as e:
+        data["errors"].append(f"gold_intl: {e}")
+    try:
+        data["gold_domestic"] = get_domestic_gold_krw_g()
+    except Exception as e:
+        data["errors"].append(f"gold_domestic: {e}")
+    if data["gold_intl_usd_oz"] and data["usd_krw"]:
+        data["gold_intl_krw_g"] = round(data["gold_intl_usd_oz"] * data["usd_krw"] / G_PER_OZT, 1)
+    if data["gold_domestic"] and data["gold_intl_krw_g"]:
+        data["gold_premium"] = round((data["gold_domestic"] / data["gold_intl_krw_g"] - 1) * 100, 2)
 
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
