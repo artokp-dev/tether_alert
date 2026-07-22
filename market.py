@@ -12,6 +12,12 @@ BITHUMB = "https://api.bithumb.com/public/ticker/USDT_KRW"
 YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d"
 DUNAMU = "https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD"
 
+# 24시간 국제 forex 환율 (무료 API 키 필요) — 평일 밤·새벽에도 움직임
+FOREX_API_KEY = os.environ.get("FOREX_API_KEY", "")
+TWELVE = "https://api.twelvedata.com/price?symbol=USD/KRW&apikey={key}"
+RATE_TTL = int(os.environ.get("RATE_TTL", "180"))   # 환율 캐시(초). 무료 API 한도 보호
+_rate_cache = {"val": None, "src": None, "ts": 0.0}
+
 # 금(Gold)
 G_PER_OZT = 31.1034768   # 1 트로이온스 = 31.1034768 g
 YAHOO_GOLD = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"  # 국제 금 (USD/oz)
@@ -93,8 +99,17 @@ def get_bithumb():
     return float(_get(BITHUMB)["data"]["closing_price"])
 
 
-def get_rate():
-    # 1순위 24시간 시장환율(야후) → 2순위 하나은행 고시환율(두나무)
+def _fetch_rate():
+    # 1순위: 24시간 국제 forex (Twelve Data) — 키가 있을 때. 저녁·새벽에도 갱신
+    if FOREX_API_KEY:
+        try:
+            j = _get(TWELVE.format(key=FOREX_API_KEY))
+            p = j.get("price")
+            if p:
+                return float(p), "24h실시간"
+        except Exception:
+            pass
+    # 2순위: 야후 시장환율 (한국 장중 위주 → 저녁엔 잘 안 움직임)
     try:
         y = _get(YAHOO)
         p = y["chart"]["result"][0]["meta"].get("regularMarketPrice")
@@ -102,8 +117,24 @@ def get_rate():
             return float(p), "시장환율"
     except Exception:
         pass
+    # 3순위: 하나은행 고시환율 (은행 영업시간만)
     d = _get(DUNAMU)
     return float(d[0]["basePrice"]), "하나은행"
+
+
+def get_rate():
+    """환율 (RATE_TTL초 캐시 — 가격은 10초마다여도 환율 API는 아껴 호출)."""
+    now = time.time()
+    if _rate_cache["val"] and now - _rate_cache["ts"] < RATE_TTL:
+        return _rate_cache["val"], _rate_cache["src"]
+    try:
+        val, src = _fetch_rate()
+        _rate_cache.update(val=val, src=src, ts=now)
+        return val, src
+    except Exception:
+        if _rate_cache["val"]:   # 조회 실패 시 마지막 값 유지
+            return _rate_cache["val"], _rate_cache["src"]
+        raise
 
 
 def _prem(p, rate):
