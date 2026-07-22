@@ -116,7 +116,7 @@
   <div class="t" id="t"></div>
 
 <script>
-const VER = 'v14';
+const VER = 'v15';
 let alarmOn = false, audioCtx = null, lastAlert = 0, lastPremAlert = 0;
 
 const thrEl = document.getElementById('thr');
@@ -237,7 +237,7 @@ async function loadServer(){
     if(!rateOk && d.usd_krw != null){ rate = d.usd_krw; rateSrc = d.rate_src || '서버'; }
     if(d.upbit != null) fbUp = d.upbit;
     if(d.bithumb != null) fbBi = d.bithumb;
-    gold = { dom: d.gold_domestic, intl: d.gold_intl_krw_g, prem: d.gold_premium, oz: d.gold_intl_usd_oz };
+    gold = { dom: d.gold_domestic, intl: d.gold_intl_krw_g, prem: d.gold_premium, oz: d.gold_intl_usd_oz, open: d.gold_market_open };
     renderGold();
   }catch(e){}
   repaint();   // 새 환율을 즉시 화면에 반영 (다음 가격 갱신까지 안 기다림)
@@ -251,13 +251,18 @@ function renderGold(){
   if(!domEl) return;
   domEl.textContent  = gold.dom  != null ? Number(gold.dom).toLocaleString()  : '—';
   intlEl.textContent = gold.intl != null ? Number(gold.intl).toLocaleString() : '—';
+  const open = gold.open;
   if(gold.prem != null){
     premEl.textContent = (gold.prem>=0?'+':'') + gold.prem.toFixed(2) + '%';
-    premEl.className = 'gprem ' + (gold.prem>=0?'pos':'neg');
+    premEl.className = 'gprem ' + (open ? (gold.prem>=0?'pos':'neg') : '');   // 마감이면 회색(참고용)
   }else{
     premEl.textContent = '—'; premEl.className = 'gprem';
   }
-  subEl.textContent = gold.oz != null ? `국제 금 $${Number(gold.oz).toLocaleString()}/oz · 약 5분마다` : '금 시세 불러오는 중…';
+  if(open === false){
+    subEl.innerHTML = '⏸ KRX 금시장 <b style="color:#ffcc00">마감</b> (평일 09:00~15:30) · 금값 참고용';
+  }else{
+    subEl.textContent = gold.oz != null ? `🟢 개장중 · 국제 금 $${Number(gold.oz).toLocaleString()}/oz` : '금 시세 불러오는 중…';
+  }
 }
 
 // 화면 그리기 (현재 rate + 주어진 가격으로)

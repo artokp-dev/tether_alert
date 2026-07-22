@@ -5,8 +5,19 @@
 import json
 import time
 import urllib.request
+from datetime import datetime, timezone, timedelta
 
 UA = {"User-Agent": "Mozilla/5.0 (KimchiPremiumTracker)"}
+KST = timezone(timedelta(hours=9))
+
+
+def is_krx_gold_open():
+    """KRX 금시장 개장 여부 — 평일 09:00~15:30 (KST)."""
+    t = datetime.now(KST)
+    if t.weekday() >= 5:
+        return False
+    hm = t.hour * 60 + t.minute
+    return 9 * 60 <= hm <= 15 * 60 + 30
 
 
 G_PER_OZT = 31.1034768
@@ -101,6 +112,7 @@ def main():
         "upbit_premium": None, "bithumb_premium": None, "spread": None,
         "gold_domestic": None, "gold_intl_usd_oz": None,
         "gold_intl_krw_g": None, "gold_premium": None,
+        "gold_market_open": is_krx_gold_open(),
         "updated": int(time.time() * 1000), "errors": [],
     }
 

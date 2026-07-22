@@ -105,6 +105,18 @@
         <span>김프 하단</span>
         <span class="two"><input type="number" id="pLow" step="0.1" inputmode="decimal"> % 아래</span>
       </div>
+      <div class="set" style="border-top:1px solid #1e1e2e;padding-top:14px;margin-top:6px;">
+        <span>금 알림 <span style="font-size:11px;color:#666">(장중 09~15:30만)</span></span>
+        <label class="switch"><input type="checkbox" id="goldEnabled"><span class="slider"></span></label>
+      </div>
+      <div class="set">
+        <span>금프 상단</span>
+        <span class="two"><input type="number" id="gHigh" step="0.1" inputmode="decimal"> % 위</span>
+      </div>
+      <div class="set">
+        <span>금프 하단</span>
+        <span class="two"><input type="number" id="gLow" step="0.1" inputmode="decimal"> % 아래</span>
+      </div>
       <div class="savemsg" id="savemsg"></div>
       <button class="btn" id="testBtn">📱 텔레그램 테스트</button>
     </div>
@@ -113,11 +125,14 @@
   </div>
 
 <script>
-const VER = 'srv2';
+const VER = 'srv3';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
 const pLowEl = document.getElementById('pLow');
+const goldEnabledEl = document.getElementById('goldEnabled');
+const gHighEl = document.getElementById('gHigh');
+const gLowEl = document.getElementById('gLow');
 
 function paint(elId, priceId, price, prem){
   const el = document.getElementById(elId);
@@ -155,15 +170,18 @@ function renderGold(d){
   const gsub = document.getElementById('goldSub');
   dom.textContent  = d.gold_domestic != null ? Number(d.gold_domestic).toLocaleString() : '—';
   intl.textContent = d.gold_intl_krw_g != null ? Number(d.gold_intl_krw_g).toLocaleString() : '—';
+  const open = d.gold_market_open;
   if(d.gold_premium != null){
     prem.textContent = (d.gold_premium>=0?'+':'') + d.gold_premium.toFixed(2) + '%';
-    prem.className = 'gprem ' + (d.gold_premium>=0?'pos':'neg');
+    // 장 마감이면 회색(참고용) — 국내 금값이 멈춰서 프리미엄이 의미 없음
+    prem.className = 'gprem ' + (open ? (d.gold_premium>=0?'pos':'neg') : '');
   }else{
     prem.textContent = '—'; prem.className = 'gprem';
   }
-  gsub.textContent = d.gold_intl_usd_oz != null
-    ? `국제 금 $${Number(d.gold_intl_usd_oz).toLocaleString()}/oz · 1oz=31.1035g`
-    : '금 시세 불러오는 중…';
+  const oz = d.gold_intl_usd_oz != null ? `국제 금 $${Number(d.gold_intl_usd_oz).toLocaleString()}/oz` : '';
+  gsub.innerHTML = open
+    ? `🟢 KRX 금시장 개장중 · ${oz}`
+    : `⏸ KRX 금시장 <b style="color:#ffcc00">마감</b> (평일 09:00~15:30) · 금값 참고용`;
 }
 
 function fillInputs(s){
@@ -171,6 +189,9 @@ function fillInputs(s){
   thrEl.value = s.spread;
   pHighEl.value = s.kimp_high;
   pLowEl.value = s.kimp_low;
+  goldEnabledEl.checked = !!s.gold_enabled;
+  if(s.gold_high != null) gHighEl.value = s.gold_high;
+  if(s.gold_low != null) gLowEl.value = s.gold_low;
 }
 function currentSettings(){
   return {
@@ -178,6 +199,9 @@ function currentSettings(){
     spread: parseFloat(thrEl.value),
     kimp_high: parseFloat(pHighEl.value),
     kimp_low: parseFloat(pLowEl.value),
+    gold_enabled: goldEnabledEl.checked,
+    gold_high: parseFloat(gHighEl.value),
+    gold_low: parseFloat(gLowEl.value),
   };
 }
 function readLocal(){ try{ return JSON.parse(localStorage.getItem('kimp_settings') || 'null'); }catch(e){ return null; } }
@@ -216,7 +240,7 @@ async function saveSettings(){
   }
 }
 
-[enabledEl, thrEl, pHighEl, pLowEl].forEach(el => el.addEventListener('change', saveSettings));
+[enabledEl, thrEl, pHighEl, pLowEl, goldEnabledEl, gHighEl, gLowEl].forEach(el => el.addEventListener('change', saveSettings));
 
 document.getElementById('testBtn').onclick = async function(){
   this.disabled = true; this.textContent = '전송 중…';

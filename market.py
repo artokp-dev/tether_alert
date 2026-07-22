@@ -1,7 +1,20 @@
 """시세 수집 + 텔레그램 (서버에서 사용). 서버가 호출하므로 CORS 없음."""
 import os
 import time
+from datetime import datetime, timezone, timedelta
+
 import requests
+
+KST = timezone(timedelta(hours=9))
+
+
+def is_krx_gold_open(now=None):
+    """KRX 금시장 개장 여부 — 평일 09:00~15:30 (KST). (공휴일은 미반영)"""
+    t = now or datetime.now(KST)
+    if t.weekday() >= 5:   # 토(5)·일(6)
+        return False
+    hm = t.hour * 60 + t.minute
+    return 9 * 60 <= hm <= 15 * 60 + 30
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8643580443:AAGe6kgVvKcSr8Wtiv8dumZrXVZDlBiwrl4")
 CHAT_ID = os.environ.get("CHAT_ID", "1772649599")
@@ -149,6 +162,7 @@ def fetch_market():
         # 금
         "gold_domestic": None, "gold_intl_usd_oz": None,
         "gold_intl_krw_g": None, "gold_premium": None,
+        "gold_market_open": is_krx_gold_open(),
         "updated": int(time.time() * 1000), "errors": [],
     }
     try:

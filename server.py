@@ -23,11 +23,15 @@ import market
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "settings.json")
 POLL = int(os.environ.get("POLL_INTERVAL", "10"))   # 감시 주기 (초)
 KST = timezone(timedelta(hours=9))
-DEFAULTS = {"enabled": True, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5}
+DEFAULTS = {
+    "enabled": True, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5,
+    # 금 알림 (KRX 금시장 개장 시간에만 작동)
+    "gold_enabled": False, "gold_high": 1.0, "gold_low": -1.0,
+}
 
 _state = {"data": None, "updated": 0.0}
 _settings = dict(DEFAULTS)
-_flags = {"spread": False, "prem": False}   # 조건 '진입'할 때만 알림 (도배 방지)
+_flags = {"spread": False, "prem": False, "gold": False}   # 조건 '진입'할 때만 알림 (도배 방지)
 
 
 def load_settings():
@@ -81,6 +85,24 @@ def check_alerts(d):
             )
         _flags["prem"] = hit
 
+    # 3) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
+    gp = d.get("gold_premium")
+    if _settings.get("gold_enabled") and d.get("gold_market_open") and gp is not None:
+        ghi = float(_settings["gold_high"])
+        glo = float(_settings["gold_low"])
+        hit = gp >= ghi or gp <= glo
+        if hit and not _flags["gold"]:
+            zone = f"▲ {ghi}% 위" if gp >= ghi else f"▼ {glo}% 아래"
+            emoji = "🟡" if gp >= 0 else "🟢"
+            market.send_telegram(
+                f"{emoji} <b>금 프리미엄 {gp:+.2f}%</b> ({zone})\n\n"
+                f"국내 금: {d['gold_domestic']:,.0f}원/g\n"
+                f"국제(환산): {d['gold_intl_krw_g']:,.0f}원/g\n⏰ {_now()}"
+            )
+        _flags["gold"] = hit
+    else:
+        _flags["gold"] = False   # 장 마감이면 리셋 → 다음 개장 때 다시 알림 가능
+
 
 def monitor():
     market.send_telegram("✅ 김프 알림 서버 시작! (24시간 감시 중)")
@@ -130,12 +152,14 @@ def get_settings():
 @app.post("/api/settings")
 async def post_settings(req: Request):
     body = await req.json()
-    for k in ("enabled", "spread", "kimp_high", "kimp_low"):
+    for k in ("enabled", "spread", "kimp_high", "kimp_low",
+              "gold_enabled", "gold_high", "gold_low"):
         if k in body:
             _settings[k] = body[k]
     save_settings()
     _flags["spread"] = False
-    _flags["prem"] = False   # 설정 바뀌면 조건 재평가
+    _flags["prem"] = False
+    _flags["gold"] = False   # 설정 바뀌면 조건 재평가
     return _settings
 
 
