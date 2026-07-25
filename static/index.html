@@ -16,7 +16,8 @@
 <style>
   html,body{margin:0;min-height:100%;background:#0a0a0f;color:#fff;
     font-family:-apple-system,'Malgun Gothic',sans-serif;
-    display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 0 40px;box-sizing:border-box;}
+    display:flex;flex-direction:column;align-items:center;gap:16px;box-sizing:border-box;
+    padding:calc(28px + env(safe-area-inset-top)) 0 40px;}   /* 아이폰 상태바에 안 가리게 */
   .wrap{width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;align-items:center;}
   .label{font-size:15px;color:#888;letter-spacing:3px;}
   .row{display:flex;width:100%;}
@@ -39,6 +40,8 @@
     border-radius:8px;padding:9px;font-size:15px;text-align:center;}
   .set .two{display:flex;gap:6px;align-items:center;}
   .set .two input{width:56px;}
+  .pm{width:32px;height:36px;border:1px solid #1e1e2e;background:#0a0a0f;color:#ffcc00;
+    border-radius:8px;font-size:18px;font-weight:700;cursor:pointer;line-height:1;padding:0;}
   .switch{position:relative;width:48px;height:28px;}
   .switch input{opacity:0;width:0;height:0;}
   .slider{position:absolute;inset:0;background:#333;border-radius:20px;transition:.2s;cursor:pointer;}
@@ -99,11 +102,11 @@
       </div>
       <div class="set">
         <span>김프 상단</span>
-        <span class="two"><input type="number" id="pHigh" step="0.1" inputmode="decimal"> % 위</span>
+        <span class="two"><button type="button" class="pm" onclick="flipSign('pHigh')">±</button><input type="number" id="pHigh" step="0.1" inputmode="decimal"> % 위</span>
       </div>
       <div class="set">
         <span>김프 하단</span>
-        <span class="two"><input type="number" id="pLow" step="0.1" inputmode="decimal"> % 아래</span>
+        <span class="two"><button type="button" class="pm" onclick="flipSign('pLow')">±</button><input type="number" id="pLow" step="0.1" inputmode="decimal"> % 아래</span>
       </div>
       <div class="set" style="border-top:1px solid #1e1e2e;padding-top:14px;margin-top:6px;">
         <span>금 알림 <span style="font-size:11px;color:#666">(장중 09~15:30만)</span></span>
@@ -111,11 +114,11 @@
       </div>
       <div class="set">
         <span>금프 상단</span>
-        <span class="two"><input type="number" id="gHigh" step="0.1" inputmode="decimal"> % 위</span>
+        <span class="two"><button type="button" class="pm" onclick="flipSign('gHigh')">±</button><input type="number" id="gHigh" step="0.1" inputmode="decimal"> % 위</span>
       </div>
       <div class="set">
         <span>금프 하단</span>
-        <span class="two"><input type="number" id="gLow" step="0.1" inputmode="decimal"> % 아래</span>
+        <span class="two"><button type="button" class="pm" onclick="flipSign('gLow')">±</button><input type="number" id="gLow" step="0.1" inputmode="decimal"> % 아래</span>
       </div>
       <div class="savemsg" id="savemsg"></div>
       <button class="btn" id="testBtn">📱 텔레그램 테스트</button>
@@ -125,7 +128,7 @@
   </div>
 
 <script>
-const VER = 'srv3';
+const VER = 'srv4';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -211,6 +214,15 @@ async function pushToServer(body){
   return fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
 }
 
+// ± 버튼: 숫자패드에 마이너스가 없어서, 부호를 이 버튼으로 바꿈
+function flipSign(id){
+  const el = document.getElementById(id);
+  let v = parseFloat(el.value);
+  if(isNaN(v)) v = 0;
+  el.value = (v === 0 ? -0 : -v);
+  saveSettings();
+}
+
 // 시작 시: 폰에 저장된 설정이 있으면 서버에 복원(재시작 대비), 없으면 서버값을 가져옴
 async function initSettings(){
   const local = readLocal();
@@ -255,6 +267,9 @@ document.getElementById('testBtn').onclick = async function(){
   await initSettings();
   poll();
   setInterval(poll, 10000);
+  // 서버가 재시작돼 설정을 잊어도, 열려 있는 동안 주기적으로 내 설정을 다시 밀어넣음
+  // (값이 그대로면 서버가 무시하므로 알림 리셋 안 됨)
+  setInterval(() => { pushToServer(currentSettings()).catch(()=>{}); }, 60000);
 })();
 </script>
 </body>

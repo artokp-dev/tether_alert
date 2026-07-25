@@ -23,8 +23,10 @@ import market
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "settings.json")
 POLL = int(os.environ.get("POLL_INTERVAL", "10"))   # 감시 주기 (초)
 KST = timezone(timedelta(hours=9))
+ALERT_COOLDOWN = int(os.environ.get("ALERT_COOLDOWN", "600"))   # 같은 알림 최소 간격(초) = 10분
+# 기본은 알림 OFF — 서버가 재시작/재배포로 초기화돼도 스팸이 안 나게. 사용자가 앱에서 켬.
 DEFAULTS = {
-    "enabled": True, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5,
+    "enabled": False, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5,
     # 금 알림 (KRX 금시장 개장 시간에만 작동)
     "gold_enabled": False, "gold_high": 1.0, "gold_low": -1.0,
 }
@@ -32,6 +34,15 @@ DEFAULTS = {
 _state = {"data": None, "updated": 0.0}
 _settings = dict(DEFAULTS)
 _flags = {"spread": False, "prem": False, "gold": False}   # 조건 '진입'할 때만 알림 (도배 방지)
+_last = {"spread": 0.0, "prem": 0.0, "gold": 0.0}          # 마지막 알림 시각 (쿨다운)
+
+
+def _fire(kind, msg):
+    """조건 '진입' + 쿨다운(10분) 통과 시에만 실제 발송 (도배 방지)."""
+    now = time.time()
+    if not _flags[kind] and now - _last[kind] > ALERT_COOLDOWN:
+        _last[kind] = now
+        market.send_telegram(msg)
 
 
 def load_settings():
@@ -61,13 +72,12 @@ def check_alerts(d):
     sp = d.get("spread")
     if sp is not None:
         hit = sp >= float(_settings["spread"])
-        if hit and not _flags["spread"]:
+        if hit:
             up, bi = d["upbit"], d["bithumb"]
             dirn = "업비트 &gt; 빗썸" if up > bi else "빗썸 &gt; 업비트"
-            market.send_telegram(
-                f"🚨 <b>USDT 거래소 차익 {sp:.1f}원</b>\n\n"
-                f"업비트: {up:,.0f}원\n빗썸: {bi:,.0f}원\n방향: {dirn}\n⏰ {_now()}"
-            )
+            _fire("spread",
+                  f"🚨 <b>USDT 거래소 차익 {sp:.1f}원</b>\n\n"
+                  f"업비트: {up:,.0f}원\n빗썸: {bi:,.0f}원\n방향: {dirn}\n⏰ {_now()}")
         _flags["spread"] = hit
     # 2) 김치 프리미엄 (상단 위 또는 하단 아래)
     avg = d.get("avg_premium")
@@ -75,14 +85,13 @@ def check_alerts(d):
         hi = float(_settings["kimp_high"])
         lo = float(_settings["kimp_low"])
         hit = avg >= hi or avg <= lo
-        if hit and not _flags["prem"]:
+        if hit:
             zone = f"▲ {hi}% 위" if avg >= hi else f"▼ {lo}% 아래"
             emoji = "🔴" if avg >= 0 else "🔵"
-            market.send_telegram(
-                f"{emoji} <b>김치 프리미엄 {avg:+.2f}%</b> ({zone})\n\n"
-                f"환율: {d['usd_krw']:,.1f}원 ({d['rate_src']})\n"
-                f"업비트: {d['upbit_premium']:+.2f}% · 빗썸: {d['bithumb_premium']:+.2f}%\n⏰ {_now()}"
-            )
+            _fire("prem",
+                  f"{emoji} <b>김치 프리미엄 {avg:+.2f}%</b> ({zone})\n\n"
+                  f"환율: {d['usd_krw']:,.1f}원 ({d['rate_src']})\n"
+                  f"업비트: {d['upbit_premium']:+.2f}% · 빗썸: {d['bithumb_premium']:+.2f}%\n⏰ {_now()}")
         _flags["prem"] = hit
 
     # 3) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
@@ -91,14 +100,13 @@ def check_alerts(d):
         ghi = float(_settings["gold_high"])
         glo = float(_settings["gold_low"])
         hit = gp >= ghi or gp <= glo
-        if hit and not _flags["gold"]:
+        if hit:
             zone = f"▲ {ghi}% 위" if gp >= ghi else f"▼ {glo}% 아래"
             emoji = "🟡" if gp >= 0 else "🟢"
-            market.send_telegram(
-                f"{emoji} <b>금 프리미엄 {gp:+.2f}%</b> ({zone})\n\n"
-                f"국내 금: {d['gold_domestic']:,.0f}원/g\n"
-                f"국제(환산): {d['gold_intl_krw_g']:,.0f}원/g\n⏰ {_now()}"
-            )
+            _fire("gold",
+                  f"{emoji} <b>금 프리미엄 {gp:+.2f}%</b> ({zone})\n\n"
+                  f"국내 금: {d['gold_domestic']:,.0f}원/g\n"
+                  f"국제(환산): {d['gold_intl_krw_g']:,.0f}원/g\n⏰ {_now()}")
         _flags["gold"] = hit
     else:
         _flags["gold"] = False   # 장 마감이면 리셋 → 다음 개장 때 다시 알림 가능
@@ -152,14 +160,18 @@ def get_settings():
 @app.post("/api/settings")
 async def post_settings(req: Request):
     body = await req.json()
+    changed = False
     for k in ("enabled", "spread", "kimp_high", "kimp_low",
               "gold_enabled", "gold_high", "gold_low"):
-        if k in body:
+        if k in body and _settings.get(k) != body[k]:
             _settings[k] = body[k]
-    save_settings()
-    _flags["spread"] = False
-    _flags["prem"] = False
-    _flags["gold"] = False   # 설정 바뀌면 조건 재평가
+            changed = True
+    if changed:
+        save_settings()
+        # 값이 실제로 바뀐 경우에만 조건·쿨다운 재평가 (주기적 재전송은 무시 → 도배 방지)
+        for k in _flags:
+            _flags[k] = False
+            _last[k] = 0.0
     return _settings
 
 
