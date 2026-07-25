@@ -113,7 +113,9 @@ def check_alerts(d):
 
 
 def monitor():
-    market.send_telegram("✅ 김프 알림 서버 시작! (24시간 감시 중)")
+    # 시작 메시지는 보내지 않음 — 서버가 잠들었다 깨어날 때마다 "시작" 알림이 도배되던 문제 제거.
+    # (알림은 오직 설정한 조건이 충족될 때만 옴)
+    print("monitor started")
     while True:
         try:
             d = market.fetch_market()
