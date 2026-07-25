@@ -17,7 +17,7 @@
   html,body{margin:0;min-height:100%;background:#0a0a0f;color:#fff;
     font-family:-apple-system,'Malgun Gothic',sans-serif;
     display:flex;flex-direction:column;align-items:center;gap:16px;box-sizing:border-box;
-    padding:calc(28px + env(safe-area-inset-top)) 0 40px;}   /* 아이폰 상태바에 안 가리게 */
+    padding:calc(env(safe-area-inset-top) + 8px) 0 40px;}   /* 상태바만 피하고 여백 최소화 */
   .wrap{width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;align-items:center;}
   .label{font-size:15px;color:#888;letter-spacing:3px;}
   .row{display:flex;width:100%;}
@@ -128,7 +128,7 @@
   </div>
 
 <script>
-const VER = 'srv4';
+const VER = 'srv5';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
