@@ -109,6 +109,18 @@
         <span class="two"><button type="button" class="pm" onclick="flipSign('pLow')">±</button><input type="number" id="pLow" step="0.1" inputmode="decimal"> % 아래</span>
       </div>
       <div class="set" style="border-top:1px solid #1e1e2e;padding-top:14px;margin-top:6px;">
+        <span>환율 알림</span>
+        <label class="switch"><input type="checkbox" id="rateEnabled"><span class="slider"></span></label>
+      </div>
+      <div class="set">
+        <span>환율 상단</span>
+        <span class="two"><input type="number" id="rHigh" step="1" inputmode="decimal"> 원 이상</span>
+      </div>
+      <div class="set">
+        <span>환율 하단</span>
+        <span class="two"><input type="number" id="rLow" step="1" inputmode="decimal"> 원 이하</span>
+      </div>
+      <div class="set" style="border-top:1px solid #1e1e2e;padding-top:14px;margin-top:6px;">
         <span>금 알림 <span style="font-size:11px;color:#666">(장중 09~15:30만)</span></span>
         <label class="switch"><input type="checkbox" id="goldEnabled"><span class="slider"></span></label>
       </div>
@@ -128,11 +140,14 @@
   </div>
 
 <script>
-const VER = 'srv5';
+const VER = 'srv6';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
 const pLowEl = document.getElementById('pLow');
+const rateEnabledEl = document.getElementById('rateEnabled');
+const rHighEl = document.getElementById('rHigh');
+const rLowEl = document.getElementById('rLow');
 const goldEnabledEl = document.getElementById('goldEnabled');
 const gHighEl = document.getElementById('gHigh');
 const gLowEl = document.getElementById('gLow');
@@ -192,6 +207,9 @@ function fillInputs(s){
   thrEl.value = s.spread;
   pHighEl.value = s.kimp_high;
   pLowEl.value = s.kimp_low;
+  rateEnabledEl.checked = !!s.rate_enabled;
+  if(s.rate_high != null) rHighEl.value = s.rate_high;
+  if(s.rate_low != null) rLowEl.value = s.rate_low;
   goldEnabledEl.checked = !!s.gold_enabled;
   if(s.gold_high != null) gHighEl.value = s.gold_high;
   if(s.gold_low != null) gLowEl.value = s.gold_low;
@@ -202,6 +220,9 @@ function currentSettings(){
     spread: parseFloat(thrEl.value),
     kimp_high: parseFloat(pHighEl.value),
     kimp_low: parseFloat(pLowEl.value),
+    rate_enabled: rateEnabledEl.checked,
+    rate_high: parseFloat(rHighEl.value),
+    rate_low: parseFloat(rLowEl.value),
     gold_enabled: goldEnabledEl.checked,
     gold_high: parseFloat(gHighEl.value),
     gold_low: parseFloat(gLowEl.value),
@@ -252,7 +273,7 @@ async function saveSettings(){
   }
 }
 
-[enabledEl, thrEl, pHighEl, pLowEl, goldEnabledEl, gHighEl, gLowEl].forEach(el => el.addEventListener('change', saveSettings));
+[enabledEl, thrEl, pHighEl, pLowEl, rateEnabledEl, rHighEl, rLowEl, goldEnabledEl, gHighEl, gLowEl].forEach(el => el.addEventListener('change', saveSettings));
 
 document.getElementById('testBtn').onclick = async function(){
   this.disabled = true; this.textContent = '전송 중…';

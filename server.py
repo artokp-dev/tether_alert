@@ -27,14 +27,16 @@ ALERT_COOLDOWN = int(os.environ.get("ALERT_COOLDOWN", "600"))   # 같은 알림 
 # 기본은 알림 OFF — 서버가 재시작/재배포로 초기화돼도 스팸이 안 나게. 사용자가 앱에서 켬.
 DEFAULTS = {
     "enabled": False, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5,
+    # 환율 알림 (원)
+    "rate_enabled": False, "rate_high": 1500.0, "rate_low": 1450.0,
     # 금 알림 (KRX 금시장 개장 시간에만 작동)
     "gold_enabled": False, "gold_high": 1.0, "gold_low": -1.0,
 }
 
 _state = {"data": None, "updated": 0.0}
 _settings = dict(DEFAULTS)
-_flags = {"spread": False, "prem": False, "gold": False}   # 조건 '진입'할 때만 알림 (도배 방지)
-_last = {"spread": 0.0, "prem": 0.0, "gold": 0.0}          # 마지막 알림 시각 (쿨다운)
+_flags = {"spread": False, "prem": False, "rate": False, "gold": False}   # 조건 '진입'할 때만 알림 (도배 방지)
+_last = {"spread": 0.0, "prem": 0.0, "rate": 0.0, "gold": 0.0}            # 마지막 알림 시각 (쿨다운)
 
 
 def _fire(kind, msg):
@@ -94,7 +96,20 @@ def check_alerts(d):
                   f"업비트: {d['upbit_premium']:+.2f}% · 빗썸: {d['bithumb_premium']:+.2f}%\n⏰ {_now()}")
         _flags["prem"] = hit
 
-    # 3) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
+    # 3) 환율 (원-달러) — 설정한 원 이상/이하
+    rt = d.get("usd_krw")
+    if _settings.get("rate_enabled") and rt is not None:
+        rhi = float(_settings["rate_high"])
+        rlo = float(_settings["rate_low"])
+        hit = rt >= rhi or rt <= rlo
+        if hit:
+            zone = f"▲ {rhi:,.0f}원 이상" if rt >= rhi else f"▼ {rlo:,.0f}원 이하"
+            _fire("rate",
+                  f"💱 <b>원-달러 환율 {rt:,.1f}원</b> ({zone})\n\n"
+                  f"출처: {d.get('rate_src')}\n⏰ {_now()}")
+        _flags["rate"] = hit
+
+    # 4) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
     gp = d.get("gold_premium")
     if _settings.get("gold_enabled") and d.get("gold_market_open") and gp is not None:
         ghi = float(_settings["gold_high"])
@@ -164,6 +179,7 @@ async def post_settings(req: Request):
     body = await req.json()
     changed = False
     for k in ("enabled", "spread", "kimp_high", "kimp_low",
+              "rate_enabled", "rate_high", "rate_low",
               "gold_enabled", "gold_high", "gold_low"):
         if k in body and _settings.get(k) != body[k]:
             _settings[k] = body[k]
