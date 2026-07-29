@@ -62,6 +62,12 @@
   .gprem{font-size:clamp(26px,10vw,48px);font-weight:800;line-height:1;color:#888;}
   .gprem.pos{color:#ffcc00;} .gprem.neg{color:#3d9bff;}
   .gsub{font-size:11px;color:#666;text-align:center;margin-top:12px;}
+  .btcrow{display:flex;gap:12px;}
+  .bitem{flex:1;text-align:center;}
+  .bname{font-size:11px;color:#888;margin-bottom:5px;}
+  .bval{font-family:'Menlo',monospace;font-size:18px;font-weight:800;color:#e8e8f5;}
+  .bchg{font-size:13px;font-weight:700;margin-top:4px;color:#888;}
+  .bchg.up{color:#ff4d5e;} .bchg.down{color:#3d9bff;}
   .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;text-align:center;
     padding:16px;font-weight:800;font-size:15px;transform:translateY(-110%);transition:.3s;z-index:99;}
   .flash.show{transform:translateY(0);}
@@ -79,6 +85,14 @@
       <span class="lbl">업비트·빗썸 테더 차이</span><span class="v" id="spreadVal">—</span>
     </div>
     <div class="sub" id="sub">불러오는 중…</div>
+
+    <div class="card">
+      <h2>비트코인 (24시간 등락)</h2>
+      <div class="btcrow">
+        <div class="bitem"><div class="bname">달러</div><div class="bval" id="btcUsd">—</div><div class="bchg" id="btcUsdChg">—</div></div>
+        <div class="bitem"><div class="bname">원화 · 업비트</div><div class="bval" id="btcKrw">—</div><div class="bchg" id="btcKrwChg">—</div></div>
+      </div>
+    </div>
 
     <div class="card">
       <h2>금 김치 프리미엄 (국내 KRX vs 국제)</h2>
@@ -140,7 +154,7 @@
   </div>
 
 <script>
-const VER = 'srv6';
+const VER = 'srv7';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -172,6 +186,7 @@ async function poll(){
       document.getElementById('spreadBox').className = 'spread' + (d.spread >= thr ? ' hot' : '');
     }
     renderGold(d);
+    renderBtc(d);
     document.getElementById('sub').innerHTML =
       `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
     document.getElementById('t').textContent =
@@ -179,6 +194,19 @@ async function poll(){
   }catch(e){
     document.getElementById('sub').textContent = '서버 연결 중…';
   }
+}
+
+function renderBtc(d){
+  const setChg = (id, c) => {
+    const el = document.getElementById(id);
+    if(c == null){ el.textContent = '—'; el.className = 'bchg'; return; }
+    el.textContent = (c >= 0 ? '▲ +' : '▼ -') + Math.abs(c).toFixed(2) + '%';
+    el.className = 'bchg ' + (c >= 0 ? 'up' : 'down');
+  };
+  document.getElementById('btcUsd').textContent = d.btc_usd != null ? '$' + Number(d.btc_usd).toLocaleString() : '—';
+  document.getElementById('btcKrw').textContent = d.btc_krw != null ? '₩' + Number(d.btc_krw).toLocaleString() : '—';
+  setChg('btcUsdChg', d.btc_usd_chg);
+  setChg('btcKrwChg', d.btc_krw_chg);
 }
 
 function renderGold(d){

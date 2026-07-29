@@ -112,6 +112,35 @@ def get_bithumb():
     return float(_get(BITHUMB)["data"]["closing_price"])
 
 
+# 비트코인
+UPBIT_BTC = "https://api.upbit.com/v1/ticker?markets=KRW-BTC"
+COINGECKO_BTC = ("https://api.coingecko.com/api/v3/simple/price"
+                 "?ids=bitcoin&vs_currencies=usd&include_24hr_change=true")
+
+
+_btc_last = {"usd": None, "usd_chg": None}
+
+
+def get_btc():
+    """비트코인 원화(업비트)·달러(코인게코) 가격 + 24h 등락률."""
+    out = {"btc_krw": None, "btc_krw_chg": None, "btc_usd": None, "btc_usd_chg": None}
+    try:
+        u = _get(UPBIT_BTC)[0]
+        out["btc_krw"] = float(u["trade_price"])
+        out["btc_krw_chg"] = round(float(u["signed_change_rate"]) * 100, 2)
+    except Exception:
+        pass
+    try:
+        g = _get(COINGECKO_BTC)["bitcoin"]
+        out["btc_usd"] = _btc_last["usd"] = float(g["usd"])
+        out["btc_usd_chg"] = _btc_last["usd_chg"] = round(float(g.get("usd_24h_change", 0)), 2)
+    except Exception:
+        # 코인게코 요청제한(429) 등 실패 시 마지막 값 유지 → 화면에서 안 사라짐
+        out["btc_usd"] = _btc_last["usd"]
+        out["btc_usd_chg"] = _btc_last["usd_chg"]
+    return out
+
+
 def _fetch_rate():
     # 1순위: 24시간 국제 forex (Twelve Data) — 키가 있을 때. 저녁·새벽에도 갱신
     if FOREX_API_KEY:
@@ -163,6 +192,8 @@ def fetch_market():
         "gold_domestic": None, "gold_intl_usd_oz": None,
         "gold_intl_krw_g": None, "gold_premium": None,
         "gold_market_open": is_krx_gold_open(),
+        # 비트코인
+        "btc_krw": None, "btc_krw_chg": None, "btc_usd": None, "btc_usd_chg": None,
         "updated": int(time.time() * 1000), "errors": [],
     }
     try:
@@ -199,6 +230,12 @@ def fetch_market():
         out["gold_intl_krw_g"] = round(out["gold_intl_usd_oz"] * rate / G_PER_OZT, 1)
     if out["gold_domestic"] and out["gold_intl_krw_g"]:
         out["gold_premium"] = round((out["gold_domestic"] / out["gold_intl_krw_g"] - 1) * 100, 2)
+
+    # --- 비트코인 (실패해도 나머지는 유지) ---
+    try:
+        out.update(get_btc())
+    except Exception as e:
+        out["errors"].append(f"btc: {e}")
 
     return out
 
