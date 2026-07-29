@@ -68,10 +68,21 @@
   .bval{font-family:'Menlo',monospace;font-size:18px;font-weight:800;color:#e8e8f5;}
   .bchg{font-size:13px;font-weight:700;margin-top:4px;color:#888;}
   .bchg.up{color:#ff4d5e;} .bchg.down{color:#3d9bff;}
-  .memo{width:100%;box-sizing:border-box;min-height:220px;resize:vertical;
-    background:#0a0a0f;border:1px solid #1e1e2e;border-radius:10px;color:#e8e8f5;
-    padding:12px;font-family:'Menlo','Courier New',monospace;font-size:14px;line-height:1.7;
-    white-space:pre;overflow-wrap:normal;}
+  .tbl-title{font-size:12px;color:#aaa;letter-spacing:1px;margin:4px 0 8px;font-weight:700;}
+  .tbl-title + .tbl-title{margin-top:20px;}
+  .gt{width:100%;border-collapse:collapse;table-layout:fixed;}
+  .gt th{font-size:11px;color:#888;font-weight:700;text-align:center;padding:6px 4px;
+    border-bottom:1px solid #1e1e2e;}
+  .gt td{padding:0;border:1px solid #1e1e2e;}
+  .gt td.del{width:36px;border:0;}
+  .gt input{width:100%;box-sizing:border-box;background:transparent;border:0;color:#e8e8f5;
+    font-family:'Menlo',monospace;font-size:16px;text-align:center;padding:12px 4px;}
+  .gt input:focus{outline:none;background:rgba(0,255,136,.07);}
+  .delbtn{width:100%;background:transparent;border:0;color:#5a5a70;font-size:18px;
+    cursor:pointer;padding:10px 0;line-height:1;}
+  .addbtn{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px dashed #333;
+    background:transparent;color:#888;font-size:13px;cursor:pointer;}
+  .addbtn:active{background:rgba(255,255,255,.03);}
   .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;text-align:center;
     padding:16px;font-weight:800;font-size:15px;transform:translateY(-110%);transition:.3s;z-index:99;}
   .flash.show{transform:translateY(0);}
@@ -155,8 +166,20 @@
     </div>
 
     <div class="card">
-      <h2>메모 (매매 계획)</h2>
-      <textarea class="memo" id="memo" spellcheck="false" placeholder="차익거래 [김프 levels]&#10;-3 / -2 / -1.8 / -1.2 / -1 1 / -0.7 1 / 0 2 / 1 2&#10;&#10;환전 [원]&#10;1470 1000 / 1450 / 1430 / 1410 / 1390 / 1370"></textarea>
+      <h2>매매 계획</h2>
+      <div class="tbl-title">차익거래 · 김프 레벨</div>
+      <table class="gt">
+        <thead><tr><th>김프 %</th><th>수량(만불)</th><th class="del"></th></tr></thead>
+        <tbody id="arbBody"></tbody>
+      </table>
+      <button type="button" class="addbtn" id="arbAdd">+ 행 추가</button>
+
+      <div class="tbl-title">환전 레벨</div>
+      <table class="gt">
+        <thead><tr><th>환율(원)</th><th>금액</th><th class="del"></th></tr></thead>
+        <tbody id="excBody"></tbody>
+      </table>
+      <button type="button" class="addbtn" id="excAdd">+ 행 추가</button>
       <div class="savemsg" id="memoMsg"></div>
     </div>
 
@@ -164,7 +187,7 @@
   </div>
 
 <script>
-const VER = 'srv8';
+const VER = 'srv9';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -322,17 +345,55 @@ document.getElementById('testBtn').onclick = async function(){
   this.disabled = false; this.textContent = '📱 텔레그램 테스트';
 };
 
-// 메모: 폰에 저장(localStorage). 서버 재시작·재배포와 무관하게 유지됨
-const memoEl = document.getElementById('memo');
+// 매매 계획: 폰에 저장(localStorage). 서버 재시작·재배포와 무관하게 유지됨
+const ARB_KEY = 'kimp_arb', EXC_KEY = 'kimp_exc';
+const ARB_DEF = [["-3",""],["-2",""],["-1.8",""],["-1.2",""],["-1","1"],["-0.7","1"],["0","2"],["1","2"]];
+const EXC_DEF = [["1470","1000"],["1450",""],["1430",""],["1410",""],["1390",""],["1370",""]];
 let memoTimer = null;
-try{ memoEl.value = localStorage.getItem('kimp_memo') || ''; }catch(e){}
-memoEl.addEventListener('input', () => {
-  try{ localStorage.setItem('kimp_memo', memoEl.value); }catch(e){}
+
+function flashSaved(){
   const m = document.getElementById('memoMsg');
   m.textContent = '저장됨 ✓';
   clearTimeout(memoTimer);
   memoTimer = setTimeout(()=>{ m.textContent = ''; }, 1200);
-});
+}
+function loadRows(key, def){
+  try{ const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(v) ? v : def; }
+  catch(e){ return def; }
+}
+function saveTable(body, key){
+  const rows = [...body.querySelectorAll('tr')]
+    .map(tr => [...tr.querySelectorAll('input')].map(i => i.value));
+  try{ localStorage.setItem(key, JSON.stringify(rows)); }catch(e){}
+  flashSaved();
+}
+// modes: 'free'(마이너스 입력용 일반 키보드) | 'dec'(숫자 패드)
+function makeRow(body, key, vals, modes){
+  const tr = document.createElement('tr');
+  modes.forEach((mode, i) => {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    if(mode === 'dec') inp.inputMode = 'decimal';   // 'free'는 마이너스 위해 일반 키보드
+    inp.value = (vals && vals[i]) || '';
+    inp.addEventListener('input', () => saveTable(body, key));
+    td.appendChild(inp); tr.appendChild(td);
+  });
+  const tdd = document.createElement('td');
+  tdd.className = 'del';
+  const del = document.createElement('button');
+  del.type = 'button'; del.className = 'delbtn'; del.textContent = '×';
+  del.onclick = () => { tr.remove(); saveTable(body, key); };
+  tdd.appendChild(del); tr.appendChild(tdd);
+  body.appendChild(tr);
+}
+function initTable(bodyId, key, def, addId, modes){
+  const body = document.getElementById(bodyId);
+  loadRows(key, def).forEach(v => makeRow(body, key, v, modes));
+  document.getElementById(addId).onclick = () => makeRow(body, key, ['',''], modes);
+}
+initTable('arbBody', ARB_KEY, ARB_DEF, 'arbAdd', ['free','dec']);   // 김프는 마이너스 입력
+initTable('excBody', EXC_KEY, EXC_DEF, 'excAdd', ['dec','dec']);
 
 (async function init(){
   await initSettings();
