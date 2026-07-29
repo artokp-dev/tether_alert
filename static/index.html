@@ -78,8 +78,9 @@
   .gt input{width:100%;box-sizing:border-box;background:transparent;border:0;color:#e8e8f5;
     font-family:'Menlo',monospace;font-size:16px;text-align:center;padding:12px 4px;}
   .gt input:focus{outline:none;background:rgba(0,255,136,.07);}
-  .delbtn{width:100%;background:transparent;border:0;color:#5a5a70;font-size:18px;
-    cursor:pointer;padding:10px 0;line-height:1;}
+  .delbtn{width:100%;background:transparent;border:0;color:#45455a;font-size:13px;
+    cursor:pointer;padding:8px 0;line-height:1;}
+  .addbtn.top{margin-top:0;margin-bottom:8px;}
   .addbtn{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px dashed #333;
     background:transparent;color:#888;font-size:13px;cursor:pointer;}
   .addbtn:active{background:rgba(255,255,255,.03);}
@@ -168,18 +169,20 @@
     <div class="card">
       <h2>매매 계획</h2>
       <div class="tbl-title">차익거래 · 김프 레벨</div>
+      <button type="button" class="addbtn top" id="arbAddTop">+ 위에 행 추가</button>
       <table class="gt">
         <thead><tr><th>김프 %</th><th>수량(만불)</th><th class="del"></th></tr></thead>
         <tbody id="arbBody"></tbody>
       </table>
-      <button type="button" class="addbtn" id="arbAdd">+ 행 추가</button>
+      <button type="button" class="addbtn" id="arbAdd">+ 아래에 행 추가</button>
 
       <div class="tbl-title">환전 레벨</div>
+      <button type="button" class="addbtn top" id="excAddTop">+ 위에 행 추가</button>
       <table class="gt">
         <thead><tr><th>환율(원)</th><th>금액</th><th class="del"></th></tr></thead>
         <tbody id="excBody"></tbody>
       </table>
-      <button type="button" class="addbtn" id="excAdd">+ 행 추가</button>
+      <button type="button" class="addbtn" id="excAdd">+ 아래에 행 추가</button>
       <div class="savemsg" id="memoMsg"></div>
     </div>
 
@@ -187,7 +190,7 @@
   </div>
 
 <script>
-const VER = 'srv9';
+const VER = 'srv10';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -368,7 +371,8 @@ function saveTable(body, key){
   flashSaved();
 }
 // modes: 'free'(마이너스 입력용 일반 키보드) | 'dec'(숫자 패드)
-function makeRow(body, key, vals, modes){
+// prepend=true 면 맨 위에 추가, 아니면 맨 아래에 추가
+function makeRow(body, key, vals, modes, prepend){
   const tr = document.createElement('tr');
   modes.forEach((mode, i) => {
     const td = document.createElement('td');
@@ -383,17 +387,25 @@ function makeRow(body, key, vals, modes){
   tdd.className = 'del';
   const del = document.createElement('button');
   del.type = 'button'; del.className = 'delbtn'; del.textContent = '×';
-  del.onclick = () => { tr.remove(); saveTable(body, key); };
+  // 실수 삭제 방지: 확인 한 번 받고 지움
+  del.onclick = () => { if(confirm('이 줄을 삭제할까요?')){ tr.remove(); saveTable(body, key); } };
   tdd.appendChild(del); tr.appendChild(tdd);
-  body.appendChild(tr);
+  if(prepend && body.firstChild) body.insertBefore(tr, body.firstChild);
+  else body.appendChild(tr);
+  return tr;
 }
-function initTable(bodyId, key, def, addId, modes){
+function addRow(body, key, modes, prepend){
+  const tr = makeRow(body, key, ['',''], modes, prepend);
+  tr.querySelector('input').focus();   // 새 줄로 바로 입력 이동
+}
+function initTable(bodyId, key, def, addId, addTopId, modes){
   const body = document.getElementById(bodyId);
-  loadRows(key, def).forEach(v => makeRow(body, key, v, modes));
-  document.getElementById(addId).onclick = () => makeRow(body, key, ['',''], modes);
+  loadRows(key, def).forEach(v => makeRow(body, key, v, modes, false));
+  document.getElementById(addId).onclick = () => addRow(body, key, modes, false);
+  document.getElementById(addTopId).onclick = () => addRow(body, key, modes, true);
 }
-initTable('arbBody', ARB_KEY, ARB_DEF, 'arbAdd', ['free','dec']);   // 김프는 마이너스 입력
-initTable('excBody', EXC_KEY, EXC_DEF, 'excAdd', ['dec','dec']);
+initTable('arbBody', ARB_KEY, ARB_DEF, 'arbAdd', 'arbAddTop', ['free','dec']);   // 김프는 마이너스 입력
+initTable('excBody', EXC_KEY, EXC_DEF, 'excAdd', 'excAddTop', ['dec','dec']);
 
 (async function init(){
   await initSettings();
