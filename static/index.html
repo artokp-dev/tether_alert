@@ -68,6 +68,10 @@
   .bval{font-family:'Menlo',monospace;font-size:18px;font-weight:800;color:#e8e8f5;}
   .bchg{font-size:13px;font-weight:700;margin-top:4px;color:#888;}
   .bchg.up{color:#ff4d5e;} .bchg.down{color:#3d9bff;}
+  .memo{width:100%;box-sizing:border-box;min-height:220px;resize:vertical;
+    background:#0a0a0f;border:1px solid #1e1e2e;border-radius:10px;color:#e8e8f5;
+    padding:12px;font-family:'Menlo','Courier New',monospace;font-size:14px;line-height:1.7;
+    white-space:pre;overflow-wrap:normal;}
   .flash{position:fixed;top:0;left:0;right:0;background:#ff4d5e;color:#fff;text-align:center;
     padding:16px;font-weight:800;font-size:15px;transform:translateY(-110%);transition:.3s;z-index:99;}
   .flash.show{transform:translateY(0);}
@@ -150,11 +154,17 @@
       <button class="btn" id="testBtn">📱 텔레그램 테스트</button>
     </div>
 
+    <div class="card">
+      <h2>메모 (매매 계획)</h2>
+      <textarea class="memo" id="memo" spellcheck="false" placeholder="차익거래 [김프 levels]&#10;-3 / -2 / -1.8 / -1.2 / -1 1 / -0.7 1 / 0 2 / 1 2&#10;&#10;환전 [원]&#10;1470 1000 / 1450 / 1430 / 1410 / 1390 / 1370"></textarea>
+      <div class="savemsg" id="memoMsg"></div>
+    </div>
+
     <div class="t" id="t"></div>
   </div>
 
 <script>
-const VER = 'srv7';
+const VER = 'srv8';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -311,6 +321,18 @@ document.getElementById('testBtn').onclick = async function(){
   }catch(e){ document.getElementById('savemsg').textContent = '오류'; }
   this.disabled = false; this.textContent = '📱 텔레그램 테스트';
 };
+
+// 메모: 폰에 저장(localStorage). 서버 재시작·재배포와 무관하게 유지됨
+const memoEl = document.getElementById('memo');
+let memoTimer = null;
+try{ memoEl.value = localStorage.getItem('kimp_memo') || ''; }catch(e){}
+memoEl.addEventListener('input', () => {
+  try{ localStorage.setItem('kimp_memo', memoEl.value); }catch(e){}
+  const m = document.getElementById('memoMsg');
+  m.textContent = '저장됨 ✓';
+  clearTimeout(memoTimer);
+  memoTimer = setTimeout(()=>{ m.textContent = ''; }, 1200);
+});
 
 (async function init(){
   await initSettings();
