@@ -17,9 +17,27 @@ def yahoo_price(sym):
     return float(j["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
 
+BROWSER = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://goldprice.org/",
+    "Origin": "https://goldprice.org",
+}
+
+
 def spot_goldprice_org():
-    j = get("https://data-asg.goldprice.org/dbXRates/USD")
-    return float(j["items"][0]["xauPrice"])
+    r = requests.get("https://data-asg.goldprice.org/dbXRates/USD",
+                     headers=BROWSER, timeout=10)
+    r.raise_for_status()
+    return float(r.json()["items"][0]["xauPrice"])
+
+
+def spot_gold_api_com():
+    # 무료·키 불필요 현물 금 API
+    r = requests.get("https://api.gold-api.com/price/XAU", headers=UA, timeout=10)
+    r.raise_for_status()
+    return float(r.json()["price"])
 
 
 def spot_stooq():
@@ -129,6 +147,10 @@ def main():
     except Exception as e:
         out["spot_stooq_err"] = str(e)
     try:
+        out["spot_gold_api_com_usd_oz"] = spot_gold_api_com()
+    except Exception as e:
+        out["spot_gold_api_err"] = str(e)
+    try:
         out["naver_intl_usd_oz"] = naver_intl_gold()
     except Exception as e:
         out["naver_intl_err"] = str(e)
@@ -144,6 +166,7 @@ def main():
                        ("현물 Yahoo XAU", "spot_yahoo_XAUUSD_usd_oz"),
                        ("현물 goldprice.org", "spot_goldprice_org_usd_oz"),
                        ("현물 stooq", "spot_stooq_usd_oz"),
+                       ("현물 gold-api.com", "spot_gold_api_com_usd_oz"),
                        ("네이버 국제금", "naver_intl_usd_oz")]:
         oz = out.get(key)
         if oz and rate and dom:
