@@ -22,6 +22,55 @@ def spot_goldprice_org():
     return float(j["items"][0]["xauPrice"])
 
 
+def spot_stooq():
+    # CSV: Symbol,Date,Time,Open,High,Low,Close,Volume
+    r = requests.get("https://stooq.com/q/l/?s=xauusd&f=sd2t2ohlcv&h&e=csv",
+                     headers=UA, timeout=10)
+    r.raise_for_status()
+    lines = r.text.strip().splitlines()
+    row = lines[-1].split(",")
+    return float(row[6])   # Close
+
+
+def naver_intl_gold():
+    # 네이버 국제 금 (뉴욕상품거래소) — USD/oz
+    for u in [
+        "https://polling.finance.naver.com/api/realtime/worldstock/index/CMDT_GC",
+        "https://api.stock.naver.com/marketindex/metals/CMDT_GC",
+        "https://m.stock.naver.com/front-api/v1/marketIndex/prices?category=metals&reutersCode=CMDT_GC&page=1&pageSize=1",
+    ]:
+        try:
+            h = dict(UA); h["Referer"] = "https://m.stock.naver.com/"
+            j = requests.get(u, headers=h, timeout=10).json()
+
+            def find(o):
+                if isinstance(o, dict):
+                    for k in ("closePrice", "nowVal", "closeVal", "price"):
+                        if o.get(k) not in (None, ""):
+                            try:
+                                v = float(str(o[k]).replace(",", ""))
+                                if 1000 < v < 10000:
+                                    return v
+                            except Exception:
+                                pass
+                    for v in o.values():
+                        r = find(v)
+                        if r:
+                            return r
+                elif isinstance(o, list):
+                    for v in o:
+                        r = find(v)
+                        if r:
+                            return r
+                return None
+            p = find(j)
+            if p:
+                return p
+        except Exception:
+            pass
+    return None
+
+
 def domestic_krw_g():
     urls = [
         "https://api.stock.naver.com/marketindex/metals/M04020000/prices?page=1&pageSize=1",
@@ -76,6 +125,14 @@ def main():
     except Exception as e:
         out["spot_gp_err"] = str(e)
     try:
+        out["spot_stooq_usd_oz"] = spot_stooq()
+    except Exception as e:
+        out["spot_stooq_err"] = str(e)
+    try:
+        out["naver_intl_usd_oz"] = naver_intl_gold()
+    except Exception as e:
+        out["naver_intl_err"] = str(e)
+    try:
         out["rate_krw"] = yahoo_price("KRW=X")
     except Exception as e:
         out["rate_err"] = str(e)
@@ -85,7 +142,9 @@ def main():
     rate = out.get("rate_krw")
     for label, key in [("선물 GC=F", "futures_GCF_usd_oz"),
                        ("현물 Yahoo XAU", "spot_yahoo_XAUUSD_usd_oz"),
-                       ("현물 goldprice.org", "spot_goldprice_org_usd_oz")]:
+                       ("현물 goldprice.org", "spot_goldprice_org_usd_oz"),
+                       ("현물 stooq", "spot_stooq_usd_oz"),
+                       ("네이버 국제금", "naver_intl_usd_oz")]:
         oz = out.get(key)
         if oz and rate and dom:
             intl = oz * rate / G
