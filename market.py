@@ -52,15 +52,26 @@ def _to_float(x):
     return float(str(x).replace(",", "").strip())
 
 
+_gold_last = {"spot": None}   # 마지막으로 받은 현물값
+
+
 def get_intl_gold_usd_oz():
-    """국제 금 현물(spot) 시세 (USD/트로이온스). 1순위 현물, 실패 시 야후 금선물(GC=F)."""
+    """국제 금 현물(spot) 시세 (USD/트로이온스).
+
+    현물(gold-api.com)을 쓰되, 조회 실패 시 '마지막 현물값'을 유지한다.
+    → 실패할 때마다 선물(GC=F)로 튀어서 김프가 -0.5%↔-2%로 흔들리는 걸 막음.
+    선물은 현물을 한 번도 못 받은 최초 부팅 때만 예비로 사용.
+    """
     try:
         p = float(_get(GOLD_API_SPOT)["price"])
         if 500 < p < 20000:   # 상식 범위
+            _gold_last["spot"] = p
             return p
     except Exception:
         pass
-    y = _get(YAHOO_GOLD)   # 예비: 선물 (현물보다 약간 높게 나옴)
+    if _gold_last["spot"] is not None:
+        return _gold_last["spot"]   # 값이 튀지 않게 마지막 현물값 유지
+    y = _get(YAHOO_GOLD)   # 최초 부팅 예비: 선물 (현물보다 약간 높음)
     return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
 

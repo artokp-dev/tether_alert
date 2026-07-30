@@ -34,15 +34,12 @@ def _to_float(x):
 
 
 def get_intl_gold_usd_oz():
-    # 국제 금 현물(spot, XAU) — goldkimp 등 김프 사이트 기준. 실패 시 야후 금선물(GC=F)
-    try:
-        p = float(get("https://api.gold-api.com/price/XAU")["price"])
-        if 500 < p < 20000:
-            return p
-    except Exception:
-        pass
-    y = get("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d")
-    return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
+    # 국제 금 현물(spot, XAU) — goldkimp 등 김프 사이트 기준.
+    # 실패 시 선물로 튀지 않게 그냥 예외 → main에서 직전 data.json 값을 유지.
+    p = float(get("https://api.gold-api.com/price/XAU")["price"])
+    if not (500 < p < 20000):
+        raise ValueError(f"gold spot out of range: {p}")
+    return p
 
 
 NAVER_GOLD_URLS = [
@@ -151,6 +148,12 @@ def main():
         data["gold_intl_usd_oz"] = get_intl_gold_usd_oz()
     except Exception as e:
         data["errors"].append(f"gold_intl: {e}")
+        # 현물 조회 실패 시 직전 data.json 값 유지 (값이 튀지 않게)
+        try:
+            with open("data.json", encoding="utf-8") as f:
+                data["gold_intl_usd_oz"] = json.load(f).get("gold_intl_usd_oz")
+        except Exception:
+            pass
     try:
         data["gold_domestic"] = get_domestic_gold_krw_g()
     except Exception as e:
