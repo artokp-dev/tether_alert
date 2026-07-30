@@ -33,7 +33,10 @@ _rate_cache = {"val": None, "src": None, "ts": 0.0}
 
 # 금(Gold)
 G_PER_OZT = 31.1034768   # 1 트로이온스 = 31.1034768 g
-YAHOO_GOLD = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"  # 국제 금 (USD/oz)
+# 국제 금 '현물(spot, XAU)' — goldkimp 등 김프 사이트가 쓰는 기준. 무료·키 불필요
+GOLD_API_SPOT = "https://api.gold-api.com/price/XAU"
+# 예비: 야후 금 '선물(GC=F)' — 현물보다 보통 1~1.5% 비쌈(콘탱고). spot 실패 시에만 사용
+YAHOO_GOLD = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d"
 # 네이버가 제공하는 국내 금(KRX 금현물, 원/g)
 NAVER_GOLD = ("https://m.stock.naver.com/front-api/v1/marketIndex/prices"
               "?page=1&category=metals&reutersCode=M04020000&pageSize=1")
@@ -50,8 +53,14 @@ def _to_float(x):
 
 
 def get_intl_gold_usd_oz():
-    """국제 금 시세 (USD / 트로이온스) — 야후 금 선물 GC=F."""
-    y = _get(YAHOO_GOLD)
+    """국제 금 현물(spot) 시세 (USD/트로이온스). 1순위 현물, 실패 시 야후 금선물(GC=F)."""
+    try:
+        p = float(_get(GOLD_API_SPOT)["price"])
+        if 500 < p < 20000:   # 상식 범위
+            return p
+    except Exception:
+        pass
+    y = _get(YAHOO_GOLD)   # 예비: 선물 (현물보다 약간 높게 나옴)
     return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
 

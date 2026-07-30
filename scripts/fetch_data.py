@@ -34,6 +34,13 @@ def _to_float(x):
 
 
 def get_intl_gold_usd_oz():
+    # 국제 금 현물(spot, XAU) — goldkimp 등 김프 사이트 기준. 실패 시 야후 금선물(GC=F)
+    try:
+        p = float(get("https://api.gold-api.com/price/XAU")["price"])
+        if 500 < p < 20000:
+            return p
+    except Exception:
+        pass
     y = get("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d")
     return float(y["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
