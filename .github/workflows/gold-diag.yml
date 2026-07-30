@@ -1,0 +1,12 @@
+name: gold-diag
+on:
+  workflow_dispatch:
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install
+        run: pip install requests
+      - name: run diagnostic
+        run: python3 scripts/gold_diag.py
