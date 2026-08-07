@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>내 건강</title>
+<meta name="theme-color" content="#0a0a0f">
+<link rel="manifest" href="health.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="내 건강">
+<style>
+  :root{
+    --bg:#0a0a0f; --card:#12121a; --line:#1e1e2e; --txt:#e8e8f5; --sub:#888;
+    --good:#38d17c; --ok:#8fa8ff; --warn:#ffb02e; --bad:#ff4d5e; --accent:#5aa9ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,'Malgun Gothic',sans-serif;font-size:15px;}
+  body{padding-bottom:calc(66px + env(safe-area-inset-bottom));}
+  header{position:sticky;top:0;z-index:5;background:rgba(10,10,15,.92);backdrop-filter:blur(8px);
+    padding:14px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px;}
+  header h1{margin:0;font-size:19px;font-weight:800;}
+  header .date{color:var(--sub);font-size:13px;}
+  main{max-width:560px;margin:0 auto;padding:14px 14px 30px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+  .card h2{margin:0 0 10px;font-size:15px;font-weight:800;color:#cfd3ff;}
+  .muted{color:var(--sub);font-size:13px;line-height:1.55;}
+  .small{font-size:12px;}
+  button{font-family:inherit;border:0;border-radius:10px;cursor:pointer;font-weight:700;}
+  .btn{background:var(--accent);color:#fff;padding:10px 14px;font-size:14px;}
+  .btn.sub{background:#232336;color:#cfd3ff;}
+  .btn.danger{background:rgba(255,77,94,.15);color:var(--bad);}
+  .btn.tiny{padding:5px 9px;font-size:12px;border-radius:8px;}
+  input,select,textarea{width:100%;background:#0d0d14;border:1px solid var(--line);border-radius:10px;
+    color:var(--txt);padding:10px;font-family:inherit;font-size:14px;}
+  textarea{min-height:80px;resize:vertical;line-height:1.5;}
+  label{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .row > *{flex:1;}
+  .row .fix{flex:0 0 auto;}
+  /* 하단 탭 */
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;
+    background:rgba(13,13,20,.97);border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1;background:none;color:var(--sub);padding:9px 0 7px;font-size:11px;
+    display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:0;}
+  nav button .ico{font-size:20px;line-height:1;}
+  nav button.on{color:var(--accent);}
+  .tab{display:none;} .tab.on{display:block;}
+  /* 판정 뱃지 */
+  .badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:800;}
+  .b-good{background:rgba(56,209,124,.15);color:var(--good);}
+  .b-ok{background:rgba(143,168,255,.15);color:var(--ok);}
+  .b-warn{background:rgba(255,176,46,.15);color:var(--warn);}
+  .b-bad{background:rgba(255,77,94,.15);color:var(--bad);}
+  .meal-item{border-top:1px solid var(--line);padding:10px 0;}
+  .meal-item:first-child{border-top:0;padding-top:2px;}
+  .meal-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .meal-head .t{font-weight:700;}
+  .meal-head .slot{color:var(--sub);font-size:12px;margin-right:6px;}
+  .verdict-msg{font-size:13px;line-height:1.55;margin-top:5px;color:#bfc3d9;}
+  .reco{background:#0d0d16;border:1px dashed #2a2a44;border-radius:12px;padding:11px 12px;margin-top:8px;}
+  .reco .slot{font-size:12px;color:var(--sub);}
+  .reco .menu{font-weight:800;font-size:15px;margin:2px 0 3px;}
+  .reco .why{font-size:12.5px;color:#9fa4c0;line-height:1.5;}
+  /* 영양제 체크 */
+  .supp-check{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
+  .supp-check:first-of-type{border-top:0;}
+  .supp-check input[type=checkbox]{width:22px;height:22px;flex:0 0 auto;accent-color:var(--good);}
+  .supp-check .nm{font-weight:700;}
+  .supp-check .tm{color:var(--sub);font-size:12px;}
+  .supp-check.done .nm{color:var(--good);}
+  /* 달력 */
+  .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .cal-head .m{font-weight:800;font-size:16px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-grid .dow{text-align:center;font-size:11px;color:var(--sub);padding:4px 0;}
+  .cal-cell{aspect-ratio:1;border-radius:10px;background:#0d0d14;border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font-size:13px;cursor:pointer;position:relative;}
+  .cal-cell.empty{background:none;border:0;cursor:default;}
+  .cal-cell.today{border-color:var(--accent);}
+  .cal-cell.sel{outline:2px solid var(--accent);}
+  .cal-cell .dots{display:flex;gap:2px;height:5px;}
+  .cal-cell .dot{width:5px;height:5px;border-radius:99px;}
+  .cal-cell .supp-ok{position:absolute;top:3px;right:4px;font-size:8px;color:var(--good);}
+  .d-good{background:var(--good);} .d-ok{background:var(--ok);}
+  .d-warn{background:var(--warn);} .d-bad{background:var(--bad);}
+  /* 목록 카드 */
+  .item-card{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:#0d0d14;}
+  .item-card .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .item-card .nm{font-weight:800;}
+  .item-card .meta{color:var(--sub);font-size:12.5px;margin-top:3px;line-height:1.5;}
+  .lab-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;}
+  .lab-table th{color:var(--sub);font-weight:600;text-align:left;padding:4px 6px;font-size:11.5px;border-bottom:1px solid var(--line);}
+  .lab-table td{padding:5px 6px;border-bottom:1px solid #16161f;}
+  .lab-low{color:var(--ok);font-weight:700;} .lab-high{color:var(--bad);font-weight:700;} .lab-norm{color:var(--good);}
+  .ex-tag{font-size:10.5px;color:var(--warn);border:1px solid rgba(255,176,46,.4);border-radius:6px;padding:1px 5px;margin-left:6px;vertical-align:1px;}
+  .notice{background:rgba(90,169,255,.08);border:1px solid rgba(90,169,255,.3);border-radius:12px;
+    padding:10px 12px;font-size:13px;line-height:1.6;color:#b9d6ff;margin-bottom:12px;}
+  dialog{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:16px;
+    width:min(92vw,480px);padding:16px;}
+  dialog::backdrop{background:rgba(0,0,0,.6);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+</style>
+</head>
+<body>
+<header><h1>🌿 내 건강</h1><span class="date" id="hdrDate"></span></header>
+<main>
+
+<!-- ═══════════ 오늘 탭 ═══════════ -->
+<section class="tab on" id="tab-today">
+  <div class="notice" id="guideNotice"></div>
+
+  <div class="card">
+    <h2>🍽 오늘 뭐 먹을까?</h2>
+    <div id="recoBox"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;">
+      <button class="btn sub tiny" onclick="reroll()">🔄 다른 메뉴 추천</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✏️ 먹은 것 기록하기</h2>
+    <div class="row">
+      <select id="mealSlot" class="fix" style="width:86px;">
+        <option>아침</option><option>점심</option><option>저녁</option><option>간식</option>
+      </select>
+      <input id="mealText" placeholder="예: 잡곡밥, 고등어구이, 나물" onkeydown="if(event.key==='Enter')addMeal()">
+      <button class="btn fix" onclick="addMeal()">기록</button>
+    </div>
+    <div id="todayMeals" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>💊 오늘의 영양제</h2>
+    <div id="suppToday"></div>
+  </div>
+</section>
+
+<!-- ═══════════ 달력 탭 ═══════════ -->
+<section class="tab" id="tab-cal">
+  <div class="card">
+    <div class="cal-head">
+      <button class="btn sub tiny" onclick="calMove(-1)">◀</button>
+      <span class="m" id="calTitle"></span>
+      <button class="btn sub tiny" onclick="calMove(1)">▶</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <p class="muted small" style="margin:10px 0 0;">
+      <span class="badge b-good">●</span> 잘 먹음 &nbsp;
+      <span class="badge b-warn">●</span> 주의 음식 &nbsp;
+      <span class="badge b-bad">●</span> 피할 음식 &nbsp;
+      ✓ = 영양제 완료
+    </p>
+  </div>
+  <div class="card" id="calDetail"><p class="muted">날짜를 누르면 그날 기록이 보여요.</p></div>
+</section>
+
+<!-- ═══════════ 영양제 탭 ═══════════ -->
+<section class="tab" id="tab-supp">
+  <div class="card">
+    <h2>💊 내 영양제 정리</h2>
+    <p class="muted">먹고 있는 영양제를 등록해두면 매일 '오늘' 탭에서 체크할 수 있어요.</p>
+    <div id="suppList" style="margin-top:10px;"></div>
+    <button class="btn" style="margin-top:6px;width:100%;" onclick="openSuppDlg()">＋ 영양제 추가</button>
+  </div>
+</section>
+
+<!-- ═══════════ 검사 탭 ═══════════ -->
+<section class="tab" id="tab-lab">
+  <div class="card">
+    <h2>🩺 검사 결과</h2>
+    <p class="muted">건강검진·혈액검사 수치를 입력해두면 언제든 다시 볼 수 있어요. 참고범위를 벗어나면 색으로 표시됩니다.</p>
+    <div id="labList" style="margin-top:10px;"></div>
+    <button class="btn" style="margin-top:6px;width:100%;" onclick="openLabDlg()">＋ 검사 결과 추가</button>
+  </div>
+</section>
+
+<!-- ═══════════ 설정 탭 ═══════════ -->
+<section class="tab" id="tab-set">
+  <div class="card">
+    <h2>📋 내 건강 지침</h2>
+    <p class="muted">Claude 건강 프로젝트에서 정리한 지침을 그대로 복사해서 붙여넣으세요. '오늘' 탭 상단에 항상 표시됩니다.</p>
+    <textarea id="setGuide" style="min-height:130px;"></textarea>
+    <button class="btn" style="margin-top:8px;" onclick="saveGuide()">지침 저장</button>
+  </div>
+  <div class="card">
+    <h2>🍚 음식 판정 규칙</h2>
+    <p class="muted">쉼표(,)로 구분해서 음식 이름을 적으면, 먹은 것을 기록할 때 자동으로 판정해줘요.</p>
+    <label>✅ 나에게 좋은 음식</label>
+    <textarea id="setGood"></textarea>
+    <label>⚠️ 적당히 먹을 음식 (주의)</label>
+    <textarea id="setCaution"></textarea>
+    <label>🚫 피해야 할 음식</label>
+    <textarea id="setAvoid"></textarea>
+    <button class="btn" style="margin-top:8px;" onclick="saveRules()">규칙 저장</button>
+  </div>
+  <div class="card">
+    <h2>🍱 추천 메뉴 목록</h2>
+    <p class="muted">쉼표(,)로 구분. '오늘 뭐 먹을까' 추천은 이 목록에서 골라줘요.</p>
+    <label>아침 메뉴</label><textarea id="setMenuB"></textarea>
+    <label>점심 메뉴</label><textarea id="setMenuL"></textarea>
+    <label>저녁 메뉴</label><textarea id="setMenuD"></textarea>
+    <button class="btn" style="margin-top:8px;" onclick="saveMenus()">메뉴 저장</button>
+  </div>
+  <div class="card">
+    <h2>💾 데이터 백업</h2>
+    <p class="muted">모든 데이터는 이 휴대폰(브라우저)에만 저장돼요. 가끔 백업해두세요.</p>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn sub" onclick="exportData()">내보내기 (백업)</button>
+      <button class="btn sub" onclick="document.getElementById('importFile').click()">가져오기 (복원)</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(this)">
+    <button class="btn danger" style="margin-top:10px;width:100%;" onclick="resetAll()">전체 초기화</button>
+  </div>
+</section>
+
+</main>
+
+<nav>
+  <button class="on" data-tab="today" onclick="showTab('today')"><span class="ico">🍽</span>오늘</button>
+  <button data-tab="cal" onclick="showTab('cal')"><span class="ico">📅</span>달력</button>
+  <button data-tab="supp" onclick="showTab('supp')"><span class="ico">💊</span>영양제</button>
+  <button data-tab="lab" onclick="showTab('lab')"><span class="ico">🩺</span>검사</button>
+  <button data-tab="set" onclick="showTab('set')"><span class="ico">⚙️</span>설정</button>
+</nav>
+
+<!-- 영양제 추가/수정 다이얼로그 -->
+<dialog id="suppDlg">
+  <h2 style="margin:0 0 4px;font-size:16px;" id="suppDlgTitle">영양제 추가</h2>
+  <label>이름</label><input id="suppNm" placeholder="예: 오메가3">
+  <label>용량/개수</label><input id="suppDose" placeholder="예: 1000mg 1알">
+  <label>먹는 때</label>
+  <select id="suppTiming">
+    <option>아침</option><option>점심</option><option>저녁</option><option>자기 전</option><option>공복</option><option>식후</option>
+  </select>
+  <label>메모 (왜 먹는지 등)</label><input id="suppMemo" placeholder="예: 혈행 개선">
+  <div class="row" style="margin-top:14px;">
+    <button class="btn sub" onclick="suppDlg.close()">취소</button>
+    <button class="btn" onclick="saveSupp()">저장</button>
+  </div>
+</dialog>
+
+<!-- 검사 결과 추가/수정 다이얼로그 -->
+<dialog id="labDlg">
+  <h2 style="margin:0 0 4px;font-size:16px;" id="labDlgTitle">검사 결과 추가</h2>
+  <div class="grid2">
+    <div><label>검사 날짜</label><input type="date" id="labDate"></div>
+    <div><label>검사명</label><input id="labTitle" placeholder="예: 건강검진 혈액검사"></div>
+  </div>
+  <label>검사 항목</label>
+  <div id="labItems"></div>
+  <button class="btn sub tiny" style="margin-top:6px;" onclick="addLabItemRow()">＋ 항목 추가</button>
+  <label>메모 / 의사 소견</label><textarea id="labMemo" style="min-height:60px;"></textarea>
+  <div class="row" style="margin-top:14px;">
+    <button class="btn sub" onclick="labDlg.close()">취소</button>
+    <button class="btn" onclick="saveLab()">저장</button>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+// ───────────────────────── 저장소 ─────────────────────────
+const KEY = 'health_app_v1';
+const DEFAULTS = {
+  guidelines: '※ 아래는 예시입니다. 설정 탭에서 Claude 건강 프로젝트의 지침을 붙여넣어 교체하세요.\n\n' +
+    '· 하루 세 끼 규칙적으로, 천천히 꼭꼭 씹어 먹기\n' +
+    '· 채소 → 단백질 → 탄수화물 순서로 먹기\n' +
+    '· 물 하루 1.5L 이상\n' +
+    '· 야식·탄산·튀김 줄이기',
+  rules: {
+    good: ['샐러드','닭가슴살','고등어','연어','생선','두부','계란','달걀','채소','야채','나물','현미','잡곡','오트밀','미역','버섯','브로콜리','토마토','견과','아몬드','그릭요거트','요거트','바나나','사과','블루베리','고구마','시금치','청국장','샤브샤브'],
+    caution: ['흰밥','쌀밥','빵','면','국수','파스타','떡','떡볶이','커피','우유','치즈','주스','초콜릿','김밥','비빔밥','찌개','국물','돈까스','제육','삼겹살','고기','치킨(구운)'],
+    avoid: ['라면','튀김','치킨','피자','햄버거','탄산','콜라','사이다','과자','케이크','아이스크림','술','소주','맥주','와인','야식','인스턴트','젓갈','곱창','마라탕','밀크티','도넛']
+  },
+  menus: {
+    '아침': ['그릭요거트 + 견과류 + 블루베리','계란 2개 + 토마토','오트밀 + 바나나','두부 샐러드','고구마 + 삶은 계란','사과 + 아몬드 한 줌'],
+    '점심': ['잡곡밥 + 고등어구이 + 나물','닭가슴살 샐러드','현미밥 + 청국장 + 채소','샤브샤브 (채소 많이)','잡곡밥 + 두부조림 + 미역국','연어 포케 (소스 적게)'],
+    '저녁': ['연어구이 + 구운 채소','두부 + 버섯볶음 + 계란','닭가슴살 + 고구마 + 샐러드','미역국 + 잡곡밥 (적게)','생선구이 + 시금치나물','채소 듬뿍 계란찜 + 현미밥 반 공기']
+  },
+  meals: {},        // { 'YYYY-MM-DD': [{id, slot, text, level, matched}] }
+  supplements: [
+    {id:'ex1', name:'오메가3 (예시)', dose:'1000mg 1알', timing:'아침', memo:'혈행 개선 — 내 것으로 수정하세요'},
+    {id:'ex2', name:'비타민D (예시)', dose:'2000IU 1알', timing:'아침', memo:''},
+    {id:'ex3', name:'유산균 (예시)', dose:'1포', timing:'공복', memo:''},
+    {id:'ex4', name:'마그네슘 (예시)', dose:'1알', timing:'자기 전', memo:'수면에 도움'}
+  ],
+  suppLog: {},      // { 'YYYY-MM-DD': [suppId,...] }
+  labs: [
+    {id:'exlab', date:'2026-01-01', title:'건강검진 (예시 — 수정하거나 지우세요)', memo:'예시 데이터입니다.',
+     items:[{name:'공복혈당', value:95, unit:'mg/dL', low:70, high:99},
+            {name:'총콜레스테롤', value:210, unit:'mg/dL', low:0, high:199},
+            {name:'AST', value:25, unit:'U/L', low:0, high:40}]}
+  ],
+  rerollOffset: 0
+};
+let S;
+function load(){
+  try{ S = Object.assign({}, structuredClone(DEFAULTS), JSON.parse(localStorage.getItem(KEY)||'{}')); }
+  catch(e){ S = structuredClone(DEFAULTS); }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ───────────────────────── 음식 판정 ─────────────────────────
+// 기록한 문장에서 규칙 키워드를 찾아 판정: 피할 음식 > 주의 > 좋음
+function judge(text){
+  const t = text.replace(/\s/g,'');
+  const hit = list => list.filter(k => k && t.includes(k.replace(/\s/g,'').replace(/\(.*\)/,'')));
+  const bad = hit(S.rules.avoid), warn = hit(S.rules.caution), good = hit(S.rules.good);
+  let level, msg;
+  if(bad.length){
+    level='bad';
+    msg = `🚫 <b>${esc(bad.join(', '))}</b> — 피하기로 한 음식이에요. 오늘 먹었다면 다음 끼니는 가볍게(채소·단백질 위주) 드시고, 물을 충분히 마셔요.`;
+  } else if(warn.length && good.length){
+    level='ok';
+    msg = `👍 <b>${esc(good.join(', '))}</b>는 좋아요. 다만 <b>${esc(warn.join(', '))}</b>는 양을 줄이고, 채소·단백질을 먼저 드세요.`;
+  } else if(warn.length){
+    level='warn';
+    msg = `⚠️ <b>${esc(warn.join(', '))}</b> — 적당히면 괜찮아요. 천천히 먹고 양을 평소의 2/3로, 채소를 곁들이면 더 좋아요.`;
+  } else if(good.length){
+    level='good';
+    msg = `✅ <b>${esc(good.join(', '))}</b> — 잘 드셨어요! 이런 식단 최고예요. 👏`;
+  } else {
+    level='ok';
+    msg = `등록 안 된 음식이에요. 천천히 꼭꼭 씹어 드세요. (설정 탭에서 이 음식을 규칙에 추가하면 다음부터 자동 판정돼요)`;
+  }
+  return {level, msg};
+}
+const LEVEL_BADGE = {good:['b-good','좋음'], ok:['b-ok','무난'], warn:['b-warn','주의'], bad:['b-bad','피하기']};
+
+// ───────────────────────── 오늘 탭 ─────────────────────────
+function slotNow(){
+  const h = new Date().getHours();
+  return h<10 ? '아침' : h<15 ? '점심' : '저녁';
+}
+// 날짜 기반으로 고정 추천 + '다른 추천' 버튼으로 순환. 피할 음식이 섞인 메뉴는 제외.
+function renderReco(){
+  const box = document.getElementById('recoBox');
+  const seed = Number(today().replace(/-/g,'')) + (S.rerollOffset||0);
+  const eaten = (S.meals[today()]||[]).map(m=>m.text).join(' ');
+  let html = '';
+  ['아침','점심','저녁'].forEach((slot,i)=>{
+    const pool = (S.menus[slot]||[]).filter(m => judge(m).level !== 'bad');
+    if(!pool.length) return;
+    const pick = pool[(seed + i*7) % pool.length];
+    const done = (S.meals[today()]||[]).some(m=>m.slot===slot);
+    const now = slotNow()===slot ? ' ⏰ 지금 끼니' : '';
+    let why = '';
+    if(done){ why = '이미 기록한 끼니예요.'; }
+    else if(eaten && judge(eaten).level==='bad'){ why = '앞서 무거운 걸 드셨으니 가볍게 가는 걸 추천해요.'; }
+    else { why = '내 규칙(좋은 음식 목록)에서 골랐어요.'; }
+    html += `<div class="reco" style="${done?'opacity:.5':''}">
+      <span class="slot">${slot}${now}</span>
+      <div class="menu">${esc(pick)}</div>
+      <div class="why">${why}</div></div>`;
+  });
+  box.innerHTML = html || '<p class="muted">설정 탭에서 추천 메뉴를 등록하세요.</p>';
+}
+function reroll(){ S.rerollOffset=(S.rerollOffset||0)+1; save(); renderReco(); }
+
+function addMeal(){
+  const txt = document.getElementById('mealText').value.trim();
+  if(!txt) return;
+  const slot = document.getElementById('mealSlot').value;
+  const v = judge(txt);
+  (S.meals[today()] = S.meals[today()]||[]).push({id:uid(), slot, text:txt, level:v.level});
+  save();
+  document.getElementById('mealText').value='';
+  renderToday(); renderReco();
+}
+function delMeal(date,id){
+  S.meals[date] = (S.meals[date]||[]).filter(m=>m.id!==id);
+  if(!S.meals[date].length) delete S.meals[date];
+  save(); renderToday(); renderReco(); renderCal();
+}
+function mealHTML(m, date){
+  const v = judge(m.text);
+  const [cls,lbl] = LEVEL_BADGE[v.level];
+  return `<div class="meal-item">
+    <div class="meal-head">
+      <span class="t"><span class="slot">${m.slot}</span>${esc(m.text)}</span>
+      <span style="display:flex;gap:6px;align-items:center;flex:0 0 auto;">
+        <span class="badge ${cls}">${lbl}</span>
+        <button class="btn danger tiny" onclick="delMeal('${date}','${m.id}')">✕</button>
+      </span>
+    </div>
+    <div class="verdict-msg">${v.msg}</div>
+  </div>`;
+}
+function renderToday(){
+  const list = S.meals[today()]||[];
+  document.getElementById('todayMeals').innerHTML =
+    list.length ? list.map(m=>mealHTML(m,today())).join('')
+                : '<p class="muted">아직 기록이 없어요. 먹은 것을 적으면 바로 판정해드려요.</p>';
+  renderSuppToday();
+}
+function renderSuppToday(){
+  const box = document.getElementById('suppToday');
+  if(!S.supplements.length){ box.innerHTML='<p class="muted">영양제 탭에서 먼저 등록하세요.</p>'; return; }
+  const taken = S.suppLog[today()]||[];
+  box.innerHTML = S.supplements.map(s=>{
+    const on = taken.includes(s.id);
+    return `<label class="supp-check ${on?'done':''}">
+      <input type="checkbox" ${on?'checked':''} onchange="toggleSupp('${s.id}')">
+      <span><span class="nm">${esc(s.name)}</span> <span class="tm">${esc(s.dose)} · ${esc(s.timing)}</span></span>
+    </label>`;
+  }).join('');
+}
+function toggleSupp(id){
+  const arr = S.suppLog[today()] = S.suppLog[today()]||[];
+  const i = arr.indexOf(id);
+  i>=0 ? arr.splice(i,1) : arr.push(id);
+  save(); renderSuppToday(); renderCal();
+}
+function renderGuide(){
+  document.getElementById('guideNotice').innerHTML =
+    '<b>📋 내 지침</b><br>' + esc(S.guidelines).replace(/\n/g,'<br>');
+}
+
+// ───────────────────────── 달력 탭 ─────────────────────────
+let calY, calM, calSel=null;   // calM: 0-11
+function calMove(d){ calM+=d; if(calM<0){calM=11;calY--;} if(calM>11){calM=0;calY++;} renderCal(); }
+function renderCal(){
+  const t = new Date();
+  if(calY===undefined){ calY=t.getFullYear(); calM=t.getMonth(); }
+  document.getElementById('calTitle').textContent = `${calY}년 ${calM+1}월`;
+  const first = new Date(calY,calM,1).getDay();
+  const days = new Date(calY,calM+1,0).getDate();
+  let html = ['일','월','화','수','목','금','토'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(let i=0;i<first;i++) html+='<div class="cal-cell empty"></div>';
+  for(let d=1;d<=days;d++){
+    const key = `${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const meals = S.meals[key]||[];
+    const levels = [...new Set(meals.map(m=>judge(m.text).level))];
+    const dots = levels.slice(0,3).map(l=>`<span class="dot d-${l}"></span>`).join('');
+    const suppDone = S.supplements.length && (S.suppLog[key]||[]).length >= S.supplements.length;
+    const cls = ['cal-cell', key===today()?'today':'', key===calSel?'sel':''].join(' ');
+    html += `<div class="${cls}" onclick="calSelect('${key}')">
+      ${suppDone?'<span class="supp-ok">✓</span>':''}${d}<span class="dots">${dots}</span></div>`;
+  }
+  document.getElementById('calGrid').innerHTML = html;
+  renderCalDetail();
+}
+function calSelect(key){ calSel=key; renderCal(); }
+function renderCalDetail(){
+  const box = document.getElementById('calDetail');
+  if(!calSel){ box.innerHTML='<p class="muted">날짜를 누르면 그날 기록이 보여요.</p>'; return; }
+  const meals = S.meals[calSel]||[];
+  const taken = (S.suppLog[calSel]||[]).map(id=>S.supplements.find(s=>s.id===id)).filter(Boolean);
+  let html = `<h2>${calSel} 기록</h2>`;
+  html += meals.length ? meals.map(m=>mealHTML(m,calSel)).join('') : '<p class="muted">식사 기록 없음</p>';
+  html += `<p class="muted" style="margin-bottom:0;">💊 영양제: ${taken.length ? esc(taken.map(s=>s.name).join(', ')) : '기록 없음'}</p>`;
+  box.innerHTML = html;
+}
+
+// ───────────────────────── 영양제 탭 ─────────────────────────
+const suppDlg = document.getElementById('suppDlg');
+let suppEditId = null;
+function renderSupp(){
+  const box = document.getElementById('suppList');
+  box.innerHTML = S.supplements.length ? S.supplements.map(s=>`
+    <div class="item-card">
+      <div class="top"><span class="nm">${esc(s.name)}</span>
+        <span style="flex:0 0 auto;display:flex;gap:6px;">
+          <button class="btn sub tiny" onclick="openSuppDlg('${s.id}')">수정</button>
+          <button class="btn danger tiny" onclick="delSupp('${s.id}')">삭제</button>
+        </span></div>
+      <div class="meta">${esc(s.dose)} · ${esc(s.timing)}${s.memo?` · ${esc(s.memo)}`:''}</div>
+    </div>`).join('') : '<p class="muted">등록된 영양제가 없어요.</p>';
+}
+function openSuppDlg(id){
+  suppEditId = id||null;
+  const s = id ? S.supplements.find(x=>x.id===id) : {name:'',dose:'',timing:'아침',memo:''};
+  document.getElementById('suppDlgTitle').textContent = id?'영양제 수정':'영양제 추가';
+  document.getElementById('suppNm').value = s.name;
+  document.getElementById('suppDose').value = s.dose;
+  document.getElementById('suppTiming').value = s.timing;
+  document.getElementById('suppMemo').value = s.memo;
+  suppDlg.showModal();
+}
+function saveSupp(){
+  const name = document.getElementById('suppNm').value.trim();
+  if(!name) return;
+  const rec = {name, dose:document.getElementById('suppDose').value.trim(),
+    timing:document.getElementById('suppTiming').value, memo:document.getElementById('suppMemo').value.trim()};
+  if(suppEditId){ Object.assign(S.supplements.find(x=>x.id===suppEditId), rec); }
+  else { S.supplements.push(Object.assign({id:uid()}, rec)); }
+  save(); suppDlg.close(); renderSupp(); renderSuppToday();
+}
+function delSupp(id){
+  if(!confirm('이 영양제를 삭제할까요?')) return;
+  S.supplements = S.supplements.filter(s=>s.id!==id);
+  save(); renderSupp(); renderSuppToday();
+}
+
+// ───────────────────────── 검사 탭 ─────────────────────────
+const labDlg = document.getElementById('labDlg');
+let labEditId = null;
+function labStatus(it){
+  const v=parseFloat(it.value), lo=parseFloat(it.low), hi=parseFloat(it.high);
+  if(isNaN(v)) return ['', esc(it.value)];
+  if(!isNaN(hi) && v>hi) return ['lab-high','높음 ▲'];
+  if(!isNaN(lo) && v<lo) return ['lab-low','낮음 ▼'];
+  return ['lab-norm','정상'];
+}
+function renderLab(){
+  const box = document.getElementById('labList');
+  const labs = [...S.labs].sort((a,b)=>b.date.localeCompare(a.date));
+  box.innerHTML = labs.length ? labs.map(l=>{
+    const rows = (l.items||[]).map(it=>{
+      const [cls,st] = labStatus(it);
+      const ref = (it.low!=='' && it.low!=null) || (it.high!=='' && it.high!=null) ? `${it.low??''}–${it.high??''}` : '-';
+      return `<tr><td>${esc(it.name)}</td><td>${esc(it.value)} ${esc(it.unit||'')}</td><td class="muted small">${ref}</td><td class="${cls}">${st}</td></tr>`;
+    }).join('');
+    return `<div class="item-card">
+      <div class="top"><span class="nm">${esc(l.date)} · ${esc(l.title)}</span>
+        <span style="flex:0 0 auto;display:flex;gap:6px;">
+          <button class="btn sub tiny" onclick="openLabDlg('${l.id}')">수정</button>
+          <button class="btn danger tiny" onclick="delLab('${l.id}')">삭제</button>
+        </span></div>
+      <table class="lab-table"><tr><th>항목</th><th>수치</th><th>참고범위</th><th>판정</th></tr>${rows}</table>
+      ${l.memo?`<div class="meta" style="margin-top:7px;">📝 ${esc(l.memo)}</div>`:''}
+    </div>`;
+  }).join('') : '<p class="muted">등록된 검사 결과가 없어요.</p>';
+}
+function labItemRow(it={}){
+  return `<div class="row lab-item-row" style="margin-top:6px;">
+    <input placeholder="항목명" value="${esc(it.name||'')}" data-f="name">
+    <input placeholder="수치" value="${esc(it.value??'')}" data-f="value" style="max-width:70px;">
+    <input placeholder="단위" value="${esc(it.unit||'')}" data-f="unit" style="max-width:64px;">
+    <input placeholder="하한" value="${esc(it.low??'')}" data-f="low" style="max-width:56px;">
+    <input placeholder="상한" value="${esc(it.high??'')}" data-f="high" style="max-width:56px;">
+  </div>`;
+}
+function addLabItemRow(){ document.getElementById('labItems').insertAdjacentHTML('beforeend', labItemRow()); }
+function openLabDlg(id){
+  labEditId = id||null;
+  const l = id ? S.labs.find(x=>x.id===id) : {date:today(), title:'', items:[{},{},{}], memo:''};
+  document.getElementById('labDlgTitle').textContent = id?'검사 결과 수정':'검사 결과 추가';
+  document.getElementById('labDate').value = l.date;
+  document.getElementById('labTitle').value = l.title;
+  document.getElementById('labMemo').value = l.memo||'';
+  document.getElementById('labItems').innerHTML = (l.items&&l.items.length?l.items:[{},{},{}]).map(labItemRow).join('');
+  labDlg.showModal();
+}
+function saveLab(){
+  const items = [...document.querySelectorAll('#labItems .lab-item-row')].map(row=>{
+    const g = f => row.querySelector(`[data-f=${f}]`).value.trim();
+    return {name:g('name'), value:g('value'), unit:g('unit'), low:g('low'), high:g('high')};
+  }).filter(it=>it.name);
+  const rec = {date:document.getElementById('labDate').value||today(),
+    title:document.getElementById('labTitle').value.trim()||'검사',
+    items, memo:document.getElementById('labMemo').value.trim()};
+  if(labEditId){ Object.assign(S.labs.find(x=>x.id===labEditId), rec); }
+  else { S.labs.push(Object.assign({id:uid()}, rec)); }
+  save(); labDlg.close(); renderLab();
+}
+function delLab(id){
+  if(!confirm('이 검사 결과를 삭제할까요?')) return;
+  S.labs = S.labs.filter(l=>l.id!==id);
+  save(); renderLab();
+}
+
+// ───────────────────────── 설정 탭 ─────────────────────────
+function renderSettings(){
+  document.getElementById('setGuide').value = S.guidelines;
+  document.getElementById('setGood').value = S.rules.good.join(', ');
+  document.getElementById('setCaution').value = S.rules.caution.join(', ');
+  document.getElementById('setAvoid').value = S.rules.avoid.join(', ');
+  document.getElementById('setMenuB').value = S.menus['아침'].join(', ');
+  document.getElementById('setMenuL').value = S.menus['점심'].join(', ');
+  document.getElementById('setMenuD').value = S.menus['저녁'].join(', ');
+}
+const splitCSV = v => v.split(',').map(s=>s.trim()).filter(Boolean);
+function saveGuide(){ S.guidelines = document.getElementById('setGuide').value; save(); renderGuide(); alert('지침을 저장했어요.'); }
+function saveRules(){
+  S.rules.good = splitCSV(document.getElementById('setGood').value);
+  S.rules.caution = splitCSV(document.getElementById('setCaution').value);
+  S.rules.avoid = splitCSV(document.getElementById('setAvoid').value);
+  save(); renderToday(); renderReco(); alert('규칙을 저장했어요.');
+}
+function saveMenus(){
+  S.menus['아침'] = splitCSV(document.getElementById('setMenuB').value);
+  S.menus['점심'] = splitCSV(document.getElementById('setMenuL').value);
+  S.menus['저녁'] = splitCSV(document.getElementById('setMenuD').value);
+  save(); renderReco(); alert('메뉴를 저장했어요.');
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `내건강_백업_${today()}.json`;
+  a.click();
+}
+function importData(input){
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      if(!d.rules || !d.menus) throw 0;
+      S = Object.assign({}, structuredClone(DEFAULTS), d);
+      save(); renderAll(); alert('복원 완료!');
+    }catch(e){ alert('백업 파일이 아니에요.'); }
+  };
+  r.readAsText(f);
+  input.value='';
+}
+function resetAll(){
+  if(!confirm('모든 기록·설정이 지워져요. 정말 초기화할까요?')) return;
+  localStorage.removeItem(KEY); load(); renderAll();
+}
+
+// ───────────────────────── 공통 ─────────────────────────
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.id==='tab-'+name));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name));
+  if(name==='cal') renderCal();
+}
+function renderAll(){
+  const d = new Date();
+  document.getElementById('hdrDate').textContent =
+    `${d.getMonth()+1}월 ${d.getDate()}일 (${['일','월','화','수','목','금','토'][d.getDay()]})`;
+  document.getElementById('mealSlot').value = slotNow();
+  renderGuide(); renderReco(); renderToday(); renderSupp(); renderLab(); renderSettings(); renderCal();
+}
+load(); renderAll();
+</script>
+</body>
+</html>
