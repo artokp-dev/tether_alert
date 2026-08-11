@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>평의 영양제 루틴</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F4EE;
+    --card:#FFFFFF;
+    --ink:#242A22;
+    --green:#2E4B3F;
+    --wood:#8A6F4D;
+    --sage:#DCE5DD;
+    --line:#E4E0D6;
+    --muted:#7A7F74;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+  body{
+    font-family:'IBM Plex Sans KR',-apple-system,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.6;
+    padding-bottom:56px;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:0 20px}
+
+  header{padding:44px 0 28px;border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:12px;letter-spacing:.18em;color:var(--wood);font-weight:700;margin-bottom:10px}
+  h1{font-family:'Gowun Batang',serif;font-size:30px;font-weight:700;color:var(--green);line-height:1.3}
+  .sub{margin-top:10px;font-size:14px;color:var(--muted)}
+
+  /* timeline spine */
+  .timeline{position:relative;padding:32px 0 8px}
+  .timeline::before{
+    content:'';position:absolute;left:11px;top:40px;bottom:24px;
+    width:2px;background:linear-gradient(var(--sage),var(--green),var(--ink));
+    border-radius:2px;
+  }
+  .slot{position:relative;padding-left:40px;margin-bottom:30px}
+  .dot{
+    position:absolute;left:0;top:4px;width:24px;height:24px;border-radius:50%;
+    background:var(--card);border:2px solid var(--green);
+    display:flex;align-items:center;justify-content:center;font-size:11px;
+  }
+  .slot.night .dot{background:var(--green)}
+  .slot-time{font-size:12px;letter-spacing:.12em;color:var(--wood);font-weight:700;margin-bottom:2px}
+  .slot-title{font-family:'Gowun Batang',serif;font-size:20px;font-weight:700;color:var(--green);margin-bottom:10px}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;
+  }
+  .pill{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .pill:last-child{border-bottom:none}
+  .pill-name{font-weight:500;font-size:15px}
+  .pill-dose{font-size:13px;color:var(--muted);white-space:nowrap}
+  .note{margin-top:10px;font-size:12.5px;color:var(--wood);background:var(--paper);border-radius:8px;padding:8px 12px;line-height:1.55}
+  .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--card);background:var(--wood);border-radius:99px;padding:1px 9px;margin-left:6px;vertical-align:2px}
+
+  section.block{margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}
+  h2{font-family:'Gowun Batang',serif;font-size:20px;font-weight:700;color:var(--green);margin-bottom:14px}
+  .list-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 18px}
+  .buy{display:flex;justify-content:space-between;align-items:baseline;padding:11px 0;border-bottom:1px dashed var(--line);font-size:14.5px}
+  .buy:last-child{border-bottom:none}
+  .buy small{color:var(--muted);font-size:12.5px}
+  .memo{font-size:13.5px;color:var(--ink);padding:10px 0;border-bottom:1px dashed var(--line);line-height:1.6}
+  .memo:last-child{border-bottom:none}
+  .memo b{color:var(--green)}
+
+  footer{margin-top:44px;text-align:center;font-size:12px;color:var(--muted)}
+  footer .leaf{font-family:'Gowun Batang',serif;color:var(--wood);font-size:13px;margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">DAILY ROUTINE · 2026.08</div>
+    <h1>평의 영양제 루틴</h1>
+    <p class="sub">하루 6타이밍 · 검사 근거 기반 최소 스택</p>
+  </header>
+
+  <div class="timeline">
+
+    <div class="slot">
+      <div class="dot">☀</div>
+      <div class="slot-time">기상 직후 · 공복</div>
+      <div class="slot-title">일어나서 물 한 잔과</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">글루타민</span><span class="pill-dose">5g 물에 타서</span></div>
+        <div class="pill"><span class="pill-name">비트루트</span><span class="pill-dose">3알</span></div>
+        <div class="note">러닝·등산 가는 날엔 비트루트를 운동 30~60분 전으로 이동</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <div class="dot">🥤</div>
+      <div class="slot-time">아침 · 스무디랑 같이</div>
+      <div class="slot-title">과일·야채 스무디와</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">B-Right (B컴플렉스)</span><span class="pill-dose">1캡슐</span></div>
+        <div class="pill"><span class="pill-name">NAC</span><span class="pill-dose">1캡슐</span></div>
+        <div class="note">B-Right는 공복 금지(니아신 플러시) · 소변 노래지는 건 정상 · 하이맵 혈액검사 2~3일 전엔 중단</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <div class="dot">🍱</div>
+      <div class="slot-time">점심 식전</div>
+      <div class="slot-title">점심 먹기 직전</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">슈퍼엔자임</span><span class="pill-dose">1알</span></div>
+        <div class="note">배달 백반이 자극적이라 점심이 효소 핵심 타이밍 — 직장 서랍에 한 통 두면 안 까먹음</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <div class="dot">🍚</div>
+      <div class="slot-time">저녁 식전</div>
+      <div class="slot-title">저녁 먹기 직전</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">글루타민</span><span class="pill-dose">5g</span></div>
+        <div class="pill"><span class="pill-name">플로라멘드 유산균</span><span class="pill-dose">1캡슐</span></div>
+        <div class="pill"><span class="pill-name">슈퍼엔자임</span><span class="pill-dose">1알</span></div>
+        <div class="note">유산균 첫 1~2주 가스·팽만은 정상 / 설사 악화 시 중단 후 하이맵 상담</div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <div class="dot">🍽</div>
+      <div class="slot-time">저녁 식후</div>
+      <div class="slot-title">저녁 먹고 나서</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">비타민 D3+K2</span><span class="pill-dose">1알</span></div>
+        <div class="pill"><span class="pill-name">아연 피콜리네이트 15mg</span><span class="pill-dose">1알</span></div>
+        <div class="pill"><span class="pill-name">NAC</span><span class="pill-dose">1캡슐</span></div>
+        <div class="note">D3+K2는 지방 있는 식사와 흡수↑ — 포케·곰탕 저녁이 딱</div>
+      </div>
+    </div>
+
+    <div class="slot night">
+      <div class="dot">🌙</div>
+      <div class="slot-time">취침 전</div>
+      <div class="slot-title">자기 전에</div>
+      <div class="card">
+        <div class="pill"><span class="pill-name">마그네슘 글리시네이트</span><span class="pill-dose">2정</span></div>
+        <div class="pill"><span class="pill-name">아쉬와간다 KSM-66</span><span class="pill-dose">1캡슐</span></div>
+        <div class="note">아쉬와간다 소진 후: 수면 유지되면 재구매 없이 종료</div>
+      </div>
+    </div>
+
+  </div>
+
+  <section class="block">
+    <h2>🛒 아이허브 장바구니</h2>
+    <div class="list-card">
+      <div class="buy"><span>뉴트리코스트 글루타민 1kg</span><small>$30</small></div>
+      <div class="buy"><span>CGN D3+K2 180정</span><small>$16.20</small></div>
+      <div class="buy"><span>Jarrow B-Right 100캡슐</span><small>$26.86</small></div>
+      <div class="buy"><span>Thorne 아연 피콜리네이트 15mg</span><small>$15</small></div>
+      <div class="buy"><span>Thorne 플로라멘드 프라임</span><small>—</small></div>
+      <div class="buy"><span>NOW 슈퍼엔자임 <small>(위맵 소진 시)</small></span><small>—</small></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2>📌 기억할 것</h2>
+    <div class="list-card">
+      <div class="memo"><b>글루타민 보관</b> — 뚜껑 꽉, 젖은 스푼 금지, 건조한 실온. 6개월 문제없음</div>
+      <div class="memo"><b>비트루트</b> — 소변·변 붉어지는 건 색소(정상). 변 물러지면 용량 절반으로</div>
+      <div class="memo"><b>셀레늄</b> — NAC에 포함돼 있으면 별도 불필요, 없어도 생선 식단으로 충분</div>
+      <div class="memo"><b>소진 후 종료</b> — NAC·아쉬와간다는 다 먹은 뒤 컨디션 보고 재구매 판단</div>
+      <div class="memo"><b>3개월 고정</b> — 이 세팅 유지 → 다음 하이맵 검사(Zn/Cu·비타민D)로 효과 검증</div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="leaf">— 편백나무처럼 단단하게 —</div>
+    2026.08 세팅 · 하이맵 처방 종료 후 자가 스택
+  </footer>
+
+</div>
+</body>
+</html>
