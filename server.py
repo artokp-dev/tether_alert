@@ -198,5 +198,13 @@ def test_alert():
     return {"ok": market.send_telegram("✅ 테스트: 김프 알림 서버 연결 성공!")}
 
 
+@app.get("/healthz")
+def healthz():
+    """가벼운 keep-alive 엔드포인트. UptimeRobot·cron-job.org가 5분마다 여길 치면
+    서버가 안 자고 24시간 감시(알림)를 계속함. (Render 무료는 15분 무접속 시 잠듦)"""
+    age = int(time.time() - _state["updated"]) if _state["updated"] else None
+    return {"ok": True, "monitor_data_age_sec": age, "enabled": _settings.get("enabled")}
+
+
 # 웹앱 서빙 (/ → static/index.html). /api/* 가 우선.
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
