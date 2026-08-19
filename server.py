@@ -137,7 +137,10 @@ def monitor():
             if d.get("usd_krw") is not None:
                 _state["data"] = d
                 _state["updated"] = time.time()
-                check_alerts(d)
+                # 알림 발송은 GitHub Actions(scripts/check_alerts.py)가 상시 담당한다.
+                # 서버는 화면용 시세만 갱신. (중복 발송 방지 — 켜려면 SERVER_SIDE_ALERTS=1)
+                if os.environ.get("SERVER_SIDE_ALERTS") == "1":
+                    check_alerts(d)
         except Exception as e:  # noqa: BLE001
             print("monitor error:", e)
         time.sleep(POLL)

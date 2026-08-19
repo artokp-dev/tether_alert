@@ -2,8 +2,12 @@ name: update-data
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # 5분마다 (GitHub 최소 간격)
+    - cron: '*/5 * * * *'   # 5분마다 요청(GitHub이 실제론 ~30분 간격으로 스로틀)
   workflow_dispatch:         # 수동 실행 버튼
+    inputs:
+      dry_run:
+        description: "1이면 텔레그램 실제 발송 안 함(테스트)"
+        default: "0"
 
 permissions:
   contents: write
@@ -21,10 +25,15 @@ jobs:
       - name: Fetch market data
         run: python3 scripts/fetch_data.py
 
-      - name: Commit data.json
+      - name: Check alerts (send Telegram)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+        run: python3 scripts/check_alerts.py
+
+      - name: Commit data + alert state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data.json
+          git add data.json alert_state.json alert_config.json
           git commit -m "chore: update market data [skip ci]" || echo "no change"
           git push

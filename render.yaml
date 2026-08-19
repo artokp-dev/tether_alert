@@ -6,6 +6,12 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
+    # 봇이 30분마다 커밋하는 데이터 파일로는 재배포하지 않음 (재배포마다 설정 초기화되던 문제 방지)
+    buildFilter:
+      ignoredPaths:
+        - data.json
+        - alert_state.json
+        - alert_config.json
     envVars:
       - key: BOT_TOKEN
         sync: false
