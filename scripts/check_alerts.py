@@ -129,8 +129,11 @@ def main():
                      f"🚨 <b>USDT 거래소 차익 {sp:.1f}원</b>\n\n"
                      f"업비트: {up:,.0f}원\n빗썸: {bi:,.0f}원\n방향: {dirn}\n⏰ {_now()}")
             flags["spread"] = hit
-        # 2) 김치 프리미엄
+        # 2) 김치 프리미엄 (data.json엔 avg_premium이 없을 수 있어 두 프리미엄 평균으로 계산)
         avg = d.get("avg_premium")
+        if avg is None:
+            _ps = [p for p in (d.get("upbit_premium"), d.get("bithumb_premium")) if p is not None]
+            avg = round(sum(_ps) / len(_ps), 2) if _ps else None
         if avg is not None:
             hi, lo = float(config["kimp_high"]), float(config["kimp_low"])
             hit = avg >= hi or avg <= lo
