@@ -110,6 +110,31 @@ def get_rate():
     return float(d[0]["basePrice"]), "하나은행"
 
 
+def get_btc():
+    """비트코인 원화(업비트)·달러 가격 + 24h 등락률. 달러는 코인게코→코인베이스 순."""
+    out = {"btc_krw": None, "btc_krw_chg": None, "btc_usd": None, "btc_usd_chg": None}
+    try:
+        u = get("https://api.upbit.com/v1/ticker?markets=KRW-BTC")[0]
+        out["btc_krw"] = float(u["trade_price"])
+        out["btc_krw_chg"] = round(float(u["signed_change_rate"]) * 100, 2)
+    except Exception:
+        pass
+    try:
+        g = get("https://api.coingecko.com/api/v3/simple/price"
+                "?ids=bitcoin&vs_currencies=usd&include_24hr_change=true")["bitcoin"]
+        out["btc_usd"] = float(g["usd"])
+        out["btc_usd_chg"] = round(float(g.get("usd_24h_change", 0)), 2)
+    except Exception:
+        try:
+            s = get("https://api.exchange.coinbase.com/products/BTC-USD/stats")
+            last = float(s["last"]); op = float(s.get("open") or 0)
+            out["btc_usd"] = last
+            out["btc_usd_chg"] = round((last / op - 1) * 100, 2) if op else None
+        except Exception:
+            pass
+    return out
+
+
 def main():
     data = {
         "upbit": None, "bithumb": None, "usd_krw": None, "rate_src": None,
@@ -117,6 +142,7 @@ def main():
         "gold_domestic": None, "gold_intl_usd_oz": None,
         "gold_intl_krw_g": None, "gold_premium": None,
         "gold_market_open": is_krx_gold_open(),
+        "btc_krw": None, "btc_krw_chg": None, "btc_usd": None, "btc_usd_chg": None,
         "updated": int(time.time() * 1000), "errors": [],
     }
 
@@ -162,6 +188,12 @@ def main():
         data["gold_intl_krw_g"] = round(data["gold_intl_usd_oz"] * data["usd_krw"] / G_PER_OZT, 1)
     if data["gold_domestic"] and data["gold_intl_krw_g"]:
         data["gold_premium"] = round((data["gold_domestic"] / data["gold_intl_krw_g"] - 1) * 100, 2)
+
+    # 비트코인
+    try:
+        data.update(get_btc())
+    except Exception as e:
+        data["errors"].append(f"btc: {e}")
 
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)

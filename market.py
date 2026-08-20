@@ -136,13 +136,29 @@ def get_bithumb():
 UPBIT_BTC = "https://api.upbit.com/v1/ticker?markets=KRW-BTC"
 COINGECKO_BTC = ("https://api.coingecko.com/api/v3/simple/price"
                  "?ids=bitcoin&vs_currencies=usd&include_24hr_change=true")
+# 예비: 코인베이스(요청제한 거의 없음). last=현재가, open=24h 전 시가 → 등락률 계산
+COINBASE_BTC = "https://api.exchange.coinbase.com/products/BTC-USD/stats"
 
 
 _btc_last = {"usd": None, "usd_chg": None}
 
 
+def _btc_usd_coingecko():
+    g = _get(COINGECKO_BTC)["bitcoin"]
+    return float(g["usd"]), round(float(g.get("usd_24h_change", 0)), 2)
+
+
+def _btc_usd_coinbase():
+    s = _get(COINBASE_BTC)
+    last = float(s["last"])
+    op = float(s.get("open") or 0)
+    chg = round((last / op - 1) * 100, 2) if op else None
+    return last, chg
+
+
 def get_btc():
-    """비트코인 원화(업비트)·달러(코인게코) 가격 + 24h 등락률."""
+    """비트코인 원화(업비트)·달러 가격 + 24h 등락률.
+    달러는 코인게코 1순위, 실패(429 등) 시 코인베이스, 그것도 실패면 마지막 값 유지."""
     out = {"btc_krw": None, "btc_krw_chg": None, "btc_usd": None, "btc_usd_chg": None}
     try:
         u = _get(UPBIT_BTC)[0]
@@ -150,12 +166,19 @@ def get_btc():
         out["btc_krw_chg"] = round(float(u["signed_change_rate"]) * 100, 2)
     except Exception:
         pass
-    try:
-        g = _get(COINGECKO_BTC)["bitcoin"]
-        out["btc_usd"] = _btc_last["usd"] = float(g["usd"])
-        out["btc_usd_chg"] = _btc_last["usd_chg"] = round(float(g.get("usd_24h_change", 0)), 2)
-    except Exception:
-        # 코인게코 요청제한(429) 등 실패 시 마지막 값 유지 → 화면에서 안 사라짐
+    usd = chg = None
+    for src in (_btc_usd_coingecko, _btc_usd_coinbase):
+        try:
+            usd, chg = src()
+            if usd:
+                break
+        except Exception:
+            continue
+    if usd:
+        out["btc_usd"] = _btc_last["usd"] = usd
+        out["btc_usd_chg"] = _btc_last["usd_chg"] = chg
+    else:
+        # 둘 다 실패 시 마지막 값 유지 → 화면에서 안 사라짐
         out["btc_usd"] = _btc_last["usd"]
         out["btc_usd_chg"] = _btc_last["usd_chg"]
     return out
