@@ -1,1 +1,1 @@
-{"enabled": true, "spread": 30, "kimp_high": -0.5, "kimp_low": -1.5, "rate_enabled": true, "rate_high": 1410, "rate_low": 1370, "gold_enabled": true, "gold_high": 2, "gold_low": -1.0}
+{"enabled": true, "spread": 30, "kimp_high": 0.5, "kimp_low": -1, "rate_enabled": true, "rate_high": 1410, "rate_low": 1370, "gold_enabled": true, "gold_high": 2, "gold_low": -1.0}
