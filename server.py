@@ -53,11 +53,14 @@ def _alert(kind, hit, msg):
 
 
 def load_settings():
-    try:
-        with open(SETTINGS_FILE) as f:
-            _settings.update(json.load(f))
-    except Exception:
-        pass
+    # 재배포/재시작으로 settings.json이 날아가도, 커밋된 alert_config.json(사용자 설정 스냅샷)에서
+    # 복구해 '전부 꺼짐'으로 리셋되지 않게 함. 이후 앱을 열면 폰의 최신값이 다시 밀려들어옴.
+    for path in ("alert_config.json", SETTINGS_FILE):
+        try:
+            with open(path) as f:
+                _settings.update(json.load(f))
+        except Exception:
+            pass
 
 
 def save_settings():
