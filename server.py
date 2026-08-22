@@ -23,7 +23,7 @@ import market
 SETTINGS_FILE = os.environ.get("SETTINGS_FILE", "settings.json")
 POLL = int(os.environ.get("POLL_INTERVAL", "10"))   # 감시 주기 (초)
 KST = timezone(timedelta(hours=9))
-ALERT_COOLDOWN = int(os.environ.get("ALERT_COOLDOWN", "600"))   # 같은 알림 최소 간격(초) = 10분
+ALERT_REPEAT = int(os.environ.get("ALERT_REPEAT", "1800"))   # 조건 유지 중 재알림 간격(초) = 30분
 # 기본은 알림 OFF — 서버가 재시작/재배포로 초기화돼도 스팸이 안 나게. 사용자가 앱에서 켬.
 DEFAULTS = {
     "enabled": False, "spread": 3.0, "kimp_high": 0.0, "kimp_low": -1.5,
@@ -39,12 +39,17 @@ _flags = {"spread": False, "prem": False, "rate": False, "gold": False}   # 조�
 _last = {"spread": 0.0, "prem": 0.0, "rate": 0.0, "gold": 0.0}            # 마지막 알림 시각 (쿨다운)
 
 
-def _fire(kind, msg):
-    """조건 '진입' + 쿨다운(10분) 통과 시에만 실제 발송 (도배 방지)."""
+def _alert(kind, hit, msg):
+    """조건에 '처음 진입'할 때 즉시 1회 + 유지되는 동안 ALERT_REPEAT(30분)마다 재알림.
+    조건을 벗어나면 플래그 해제 → 다시 들어올 때 또 즉시 알림."""
     now = time.time()
-    if not _flags[kind] and now - _last[kind] > ALERT_COOLDOWN:
-        _last[kind] = now
-        market.send_telegram(msg)
+    if hit:
+        if (not _flags[kind]) or (now - _last[kind] >= ALERT_REPEAT):
+            _last[kind] = now
+            market.send_telegram(msg)
+        _flags[kind] = True
+    else:
+        _flags[kind] = False
 
 
 def load_settings():
@@ -74,27 +79,23 @@ def check_alerts(d):
     sp = d.get("spread")
     if sp is not None:
         hit = sp >= float(_settings["spread"])
-        if hit:
-            up, bi = d["upbit"], d["bithumb"]
-            dirn = "업비트 &gt; 빗썸" if up > bi else "빗썸 &gt; 업비트"
-            _fire("spread",
-                  f"🚨 <b>USDT 거래소 차익 {sp:.1f}원</b>\n\n"
-                  f"업비트: {up:,.0f}원\n빗썸: {bi:,.0f}원\n방향: {dirn}\n⏰ {_now()}")
-        _flags["spread"] = hit
+        up, bi = d.get("upbit") or 0, d.get("bithumb") or 0
+        dirn = "업비트 &gt; 빗썸" if up > bi else "빗썸 &gt; 업비트"
+        _alert("spread", hit,
+               f"🚨 <b>USDT 거래소 차익 {sp:.1f}원</b>\n\n"
+               f"업비트: {up:,.0f}원\n빗썸: {bi:,.0f}원\n방향: {dirn}\n⏰ {_now()}")
     # 2) 김치 프리미엄 (상단 위 또는 하단 아래)
     avg = d.get("avg_premium")
     if avg is not None:
         hi = float(_settings["kimp_high"])
         lo = float(_settings["kimp_low"])
         hit = avg >= hi or avg <= lo
-        if hit:
-            zone = f"▲ {hi}% 위" if avg >= hi else f"▼ {lo}% 아래"
-            emoji = "🔴" if avg >= 0 else "🔵"
-            _fire("prem",
-                  f"{emoji} <b>김치 프리미엄 {avg:+.2f}%</b> ({zone})\n\n"
-                  f"환율: {d['usd_krw']:,.1f}원 ({d['rate_src']})\n"
-                  f"업비트: {d['upbit_premium']:+.2f}% · 빗썸: {d['bithumb_premium']:+.2f}%\n⏰ {_now()}")
-        _flags["prem"] = hit
+        zone = f"▲ {hi}% 위" if avg >= hi else f"▼ {lo}% 아래"
+        emoji = "🔴" if avg >= 0 else "🔵"
+        _alert("prem", hit,
+               f"{emoji} <b>김치 프리미엄 {avg:+.2f}%</b> ({zone})\n\n"
+               f"환율: {d['usd_krw']:,.1f}원 ({d['rate_src']})\n"
+               f"업비트: {d['upbit_premium']:+.2f}% · 빗썸: {d['bithumb_premium']:+.2f}%\n⏰ {_now()}")
 
     # 3) 환율 (원-달러) — 설정한 원 이상/이하
     rt = d.get("usd_krw")
@@ -102,12 +103,12 @@ def check_alerts(d):
         rhi = float(_settings["rate_high"])
         rlo = float(_settings["rate_low"])
         hit = rt >= rhi or rt <= rlo
-        if hit:
-            zone = f"▲ {rhi:,.0f}원 이상" if rt >= rhi else f"▼ {rlo:,.0f}원 이하"
-            _fire("rate",
-                  f"💱 <b>원-달러 환율 {rt:,.1f}원</b> ({zone})\n\n"
-                  f"출처: {d.get('rate_src')}\n⏰ {_now()}")
-        _flags["rate"] = hit
+        zone = f"▲ {rhi:,.0f}원 이상" if rt >= rhi else f"▼ {rlo:,.0f}원 이하"
+        _alert("rate", hit,
+               f"💱 <b>원-달러 환율 {rt:,.1f}원</b> ({zone})\n\n"
+               f"출처: {d.get('rate_src')}\n⏰ {_now()}")
+    else:
+        _flags["rate"] = False
 
     # 4) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
     gp = d.get("gold_premium")
@@ -115,14 +116,12 @@ def check_alerts(d):
         ghi = float(_settings["gold_high"])
         glo = float(_settings["gold_low"])
         hit = gp >= ghi or gp <= glo
-        if hit:
-            zone = f"▲ {ghi}% 위" if gp >= ghi else f"▼ {glo}% 아래"
-            emoji = "🟡" if gp >= 0 else "🟢"
-            _fire("gold",
-                  f"{emoji} <b>금 프리미엄 {gp:+.2f}%</b> ({zone})\n\n"
-                  f"국내 금: {d['gold_domestic']:,.0f}원/g\n"
-                  f"국제(환산): {d['gold_intl_krw_g']:,.0f}원/g\n⏰ {_now()}")
-        _flags["gold"] = hit
+        zone = f"▲ {ghi}% 위" if gp >= ghi else f"▼ {glo}% 아래"
+        emoji = "🟡" if gp >= 0 else "🟢"
+        _alert("gold", hit,
+               f"{emoji} <b>금 프리미엄 {gp:+.2f}%</b> ({zone})\n\n"
+               f"국내 금: {d['gold_domestic']:,.0f}원/g\n"
+               f"국제(환산): {d['gold_intl_krw_g']:,.0f}원/g\n⏰ {_now()}")
     else:
         _flags["gold"] = False   # 장 마감이면 리셋 → 다음 개장 때 다시 알림 가능
 
@@ -137,9 +136,9 @@ def monitor():
             if d.get("usd_krw") is not None:
                 _state["data"] = d
                 _state["updated"] = time.time()
-                # 알림 발송은 GitHub Actions(scripts/check_alerts.py)가 상시 담당한다.
-                # 서버는 화면용 시세만 갱신. (중복 발송 방지 — 켜려면 SERVER_SIDE_ALERTS=1)
-                if os.environ.get("SERVER_SIDE_ALERTS") == "1":
+                # 서버가 깨어 있을 땐 실시간(10초)으로 알림 판정·발송.
+                # 서버가 잠들면 GitHub Actions가 백업으로 대신 쏨(중복 안 되게 서버 warm이면 skip).
+                if os.environ.get("SERVER_SIDE_ALERTS", "1") != "0":
                     check_alerts(d)
         except Exception as e:  # noqa: BLE001
             print("monitor error:", e)
