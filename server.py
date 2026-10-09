@@ -38,6 +38,22 @@ _settings = dict(DEFAULTS)
 _flags = {"spread": False, "prem": False, "rate": False, "gold": False}   # 조건 '진입'할 때만 알림 (도배 방지)
 _last = {"spread": 0.0, "prem": 0.0, "rate": 0.0, "gold": 0.0}            # 마지막 알림 시각 (쿨다운)
 
+# 국내 금값 '움직임' 감지 — 공휴일·휴장이면 국내 금값이 멈추므로, 최근 변동이 없으면 금 알림을 끔.
+# (달력에 공휴일을 박지 않아도 자동으로 처리됨)
+GOLD_FRESH = int(os.environ.get("GOLD_FRESH", "2400"))   # 국내 금값이 이 시간(초) 안에 변해야 '장중'으로 봄 = 40분
+_gold_track = {"val": None, "ts": 0.0}
+
+
+def gold_is_live(d):
+    """국내 금값이 최근 GOLD_FRESH초 안에 '변했는지'. 휴장/정지면 값이 안 변해 False."""
+    now = time.time()
+    dom = d.get("gold_domestic")
+    if dom is not None and _gold_track["val"] is not None and dom != _gold_track["val"]:
+        _gold_track["ts"] = now            # 값이 실제로 바뀐 순간 기록
+    if dom is not None:
+        _gold_track["val"] = dom
+    return _gold_track["ts"] > 0 and (now - _gold_track["ts"]) < GOLD_FRESH
+
 
 def _alert(kind, hit, msg):
     """조건에 '처음 진입'할 때 즉시 1회 + 유지되는 동안 ALERT_REPEAT(30분)마다 재알림.
@@ -113,9 +129,9 @@ def check_alerts(d):
     else:
         _flags["rate"] = False
 
-    # 4) 금 프리미엄 (KRX 금시장 개장 시간에만! 마감이면 국내 금값이 멈춰 의미 없음)
+    # 4) 금 프리미엄 — KRX 개장 시간 + 국내 금값이 실제로 '움직일 때'만 (공휴일/휴장엔 안 옴)
     gp = d.get("gold_premium")
-    if _settings.get("gold_enabled") and d.get("gold_market_open") and gp is not None:
+    if _settings.get("gold_enabled") and d.get("gold_market_open") and d.get("gold_live") and gp is not None:
         ghi = float(_settings["gold_high"])
         glo = float(_settings["gold_low"])
         hit = gp >= ghi or gp <= glo
@@ -137,6 +153,7 @@ def monitor():
         try:
             d = market.fetch_market()
             if d.get("usd_krw") is not None:
+                d["gold_live"] = gold_is_live(d)
                 _state["data"] = d
                 _state["updated"] = time.time()
                 # 서버가 깨어 있을 땐 실시간(10초)으로 알림 판정·발송.
@@ -166,6 +183,7 @@ def prices():
     if d is None or time.time() - _state["updated"] > 60:
         fresh = market.fetch_market()
         if fresh.get("usd_krw") is not None:
+            fresh["gold_live"] = gold_is_live(fresh)
             _state["data"] = fresh
             _state["updated"] = time.time()
             d = fresh

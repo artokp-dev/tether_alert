@@ -195,7 +195,7 @@
   </div>
 
 <script>
-const VER = 'srv11';
+const VER = 'srv12';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -257,18 +257,23 @@ function renderGold(d){
   const gsub = document.getElementById('goldSub');
   dom.textContent  = d.gold_domestic != null ? Number(d.gold_domestic).toLocaleString() : '—';
   intl.textContent = d.gold_intl_krw_g != null ? Number(d.gold_intl_krw_g).toLocaleString() : '—';
-  const open = d.gold_market_open;
+  // 국내 금값이 실제로 움직일 때만 '개장'으로 취급 (공휴일엔 평일이어도 국내 금값이 멈춤)
+  const live = d.gold_market_open && (d.gold_live !== false);
   if(d.gold_premium != null){
     prem.textContent = (d.gold_premium>=0?'+':'') + d.gold_premium.toFixed(2) + '%';
-    // 장 마감이면 회색(참고용) — 국내 금값이 멈춰서 프리미엄이 의미 없음
-    prem.className = 'gprem ' + (open ? (d.gold_premium>=0?'pos':'neg') : '');
+    // 휴장/멈춤이면 회색(참고용) — 국내 금값이 멈춰서 프리미엄이 의미 없음
+    prem.className = 'gprem ' + (live ? (d.gold_premium>=0?'pos':'neg') : '');
   }else{
     prem.textContent = '—'; prem.className = 'gprem';
   }
   const oz = d.gold_intl_usd_oz != null ? `국제 금 $${Number(d.gold_intl_usd_oz).toLocaleString()}/oz` : '';
-  gsub.innerHTML = open
-    ? `🟢 KRX 금시장 개장중 · ${oz}`
-    : `⏸ KRX 금시장 <b style="color:#ffcc00">마감</b> (평일 09:00~15:30) · 금값 참고용`;
+  if(live){
+    gsub.innerHTML = `🟢 KRX 금시장 개장중 · ${oz}`;
+  }else if(d.gold_market_open){
+    gsub.innerHTML = `⏸ <b style="color:#ffcc00">휴장</b> · 국내 금값 멈춤(공휴일 등) · 금값 참고용`;
+  }else{
+    gsub.innerHTML = `⏸ KRX 금시장 <b style="color:#ffcc00">마감</b> (평일 09:00~15:30) · 금값 참고용`;
+  }
 }
 
 function fillInputs(s){

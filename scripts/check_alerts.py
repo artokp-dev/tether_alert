@@ -23,6 +23,7 @@ DATA_FILE = "data.json"
 CONFIG_FILE = "alert_config.json"
 STATE_FILE = "alert_state.json"
 REPEAT = int(os.environ.get("ALERT_REPEAT", "1800"))      # 조건 유지 중 재알림 간격(초)=30분
+GOLD_FRESH = int(os.environ.get("GOLD_FRESH", "2400"))    # 국내 금값이 이 시간 안에 변해야 '장중'=40분
 DRY_RUN = os.environ.get("DRY_RUN") == "1"                 # 테스트: 실제 발송 안 함
 RENDER_BASE = os.environ.get("RENDER_BASE", "https://tether-alert.onrender.com")
 RENDER_SETTINGS_URL = RENDER_BASE + "/api/settings"
@@ -176,9 +177,18 @@ def main():
                   f"출처: {d.get('rate_src')}\n⏰ {_now()}")
         else:
             flags["rate"] = False
-        # 4) 금 프리미엄 (KRX 개장 시간에만)
+        # 4) 금 프리미엄 — KRX 개장 + 국내 금값이 실제로 '움직일 때'만 (공휴일/휴장엔 안 옴)
         gp = d.get("gold_premium")
-        if config.get("gold_enabled") and d.get("gold_market_open") and gp is not None:
+        dom = d.get("gold_domestic")
+        gtrack = state.get("gold_track", {"val": None, "ts": 0})
+        nowt = time.time()
+        if dom is not None and gtrack.get("val") is not None and dom != gtrack["val"]:
+            gtrack["ts"] = nowt
+        if dom is not None:
+            gtrack["val"] = dom
+        state["gold_track"] = gtrack
+        gold_live = gtrack.get("ts", 0) > 0 and (nowt - gtrack["ts"]) < GOLD_FRESH
+        if config.get("gold_enabled") and d.get("gold_market_open") and gold_live and gp is not None:
             ghi, glo = float(config["gold_high"]), float(config["gold_low"])
             zone = f"▲ {ghi}% 위" if gp >= ghi else f"▼ {glo}% 아래"
             emoji = "🟡" if gp >= 0 else "🟢"
