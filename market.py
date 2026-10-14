@@ -28,7 +28,7 @@ DUNAMU = "https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD"
 # 24시간 국제 forex 환율 (무료 API 키 필요) — 평일 밤·새벽에도 움직임
 FOREX_API_KEY = os.environ.get("FOREX_API_KEY", "")
 TWELVE = "https://api.twelvedata.com/price?symbol=USD/KRW&apikey={key}"
-RATE_TTL = int(os.environ.get("RATE_TTL", "180"))   # 환율 캐시(초). 무료 API 한도 보호
+RATE_TTL = int(os.environ.get("RATE_TTL", "120"))   # 환율 캐시(초). 2분=하루 720회 → Twelve 무료(800회) 이내
 _rate_cache = {"val": None, "src": None, "ts": 0.0}
 
 # 금(Gold)
@@ -194,14 +194,14 @@ def _fetch_rate():
                 return float(p), "24h실시간"
         except Exception:
             pass
-    # 2순위: 야후 시장환율 (한국 장중 위주 → 저녁엔 잘 안 움직임)
-    try:
-        y = _get(YAHOO)
-        p = y["chart"]["result"][0]["meta"].get("regularMarketPrice")
-        if p:
-            return float(p), "시장환율"
-    except Exception:
-        pass
+    # 2순위: 야후 시장환율 — query1이 막히면 query2로 재시도
+    for url in (YAHOO, YAHOO.replace("query1.", "query2.")):
+        try:
+            p = _get(url)["chart"]["result"][0]["meta"].get("regularMarketPrice")
+            if p:
+                return float(p), "시장환율"
+        except Exception:
+            continue
     # 3순위: 하나은행 고시환율 (은행 영업시간만)
     d = _get(DUNAMU)
     return float(d[0]["basePrice"]), "하나은행"
@@ -249,6 +249,8 @@ def fetch_market():
         out["errors"].append(f"bithumb: {e}")
     try:
         out["usd_krw"], out["rate_src"] = get_rate()
+        # 마지막으로 환율을 '성공적으로' 받아온 시각 → 화면에 "N초 전 갱신" 표시용
+        out["rate_ts"] = int(_rate_cache["ts"] * 1000) or None
     except Exception as e:
         out["errors"].append(f"rate: {e}")
 

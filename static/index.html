@@ -195,7 +195,7 @@
   </div>
 
 <script>
-const VER = 'srv12';
+const VER = 'srv13';
 const enabledEl = document.getElementById('enabled');
 const thrEl = document.getElementById('thr');
 const pHighEl = document.getElementById('pHigh');
@@ -228,8 +228,15 @@ async function poll(){
     }
     renderGold(d);
     renderBtc(d);
+    // 환율은 2분마다 갱신(무료 API 한도) → 마지막 갱신 시각을 함께 보여줌. 10분 넘게 못 받으면 경고
+    let age = '';
+    if(d.rate_ts){
+      const s = Math.max(0, Math.round((Date.now() - d.rate_ts) / 1000));
+      const txt = s < 60 ? `${s}초 전` : `${Math.round(s/60)}분 전`;
+      age = s > 600 ? ` · <b style="color:#ffcc00">⚠ ${txt} 갱신(지연)</b>` : ` · ${txt} 갱신`;
+    }
     document.getElementById('sub').innerHTML =
-      `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''})`;
+      `실제 환율 <b>${Number(d.usd_krw).toLocaleString()}원</b> (${d.rate_src || ''}${age})`;
     document.getElementById('t').textContent =
       new Date().toLocaleTimeString('ko-KR') + ' · 서버 실시간 · ' + VER;
   }catch(e){

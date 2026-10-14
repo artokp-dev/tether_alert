@@ -98,13 +98,14 @@ def get_bithumb():
 
 def get_rate():
     # 1순위: 24시간 시장환율 (야후 인터뱅크)
-    try:
-        y = get("https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d")
-        m = y["chart"]["result"][0]["meta"]
-        if m.get("regularMarketPrice"):
-            return float(m["regularMarketPrice"]), "시장환율"
-    except Exception:
-        pass
+    for host in ("query1", "query2"):   # query1이 막히면 query2
+        try:
+            y = get(f"https://{host}.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1m&range=1d")
+            m = y["chart"]["result"][0]["meta"]
+            if m.get("regularMarketPrice"):
+                return float(m["regularMarketPrice"]), "시장환율"
+        except Exception:
+            continue
     # 2순위: 하나은행 고시환율 (두나무 제공)
     d = get("https://quotation-api-cdn.dunamu.com/v1/forex/recent?codes=FRX.KRWUSD")
     return float(d[0]["basePrice"]), "하나은행"
